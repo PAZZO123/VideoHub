@@ -4,7 +4,9 @@ import {
   LogOut,
   Menu,
   Search,
+  Shield,
   Sparkles,
+  Upload,
   User,
   X,
 } from 'lucide-react';
@@ -23,7 +25,7 @@ const NAV_LINKS = [
 ];
 
 export function Navbar(): JSX.Element {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -105,6 +107,18 @@ export function Navbar(): JSX.Element {
 
           {isAuthenticated ? (
             <div className="hidden items-center gap-2 sm:flex">
+              <Link to="/upload">
+                <Button size="sm" variant="ghost" leftIcon={<Upload className="size-4" />}>
+                  Upload
+                </Button>
+              </Link>
+              {isAdmin && (
+                <Link to="/admin">
+                  <Button size="sm" variant="ghost" leftIcon={<Shield className="size-4" />}>
+                    Admin
+                  </Button>
+                </Link>
+              )}
               <Link
                 to="/profile"
                 className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-ink-200 transition-colors hover:bg-white/[0.06] hover:text-white"
@@ -180,6 +194,18 @@ export function Navbar(): JSX.Element {
           <div className="mt-4 flex flex-col gap-2 border-t border-white/[0.06] pt-4">
             {isAuthenticated ? (
               <>
+                <Link to="/upload" onClick={() => setMobileOpen(false)}>
+                  <Button variant="outline" fullWidth leftIcon={<Upload className="size-4" />}>
+                    Upload a video
+                  </Button>
+                </Link>
+                {isAdmin && (
+                  <Link to="/admin" onClick={() => setMobileOpen(false)}>
+                    <Button variant="outline" fullWidth leftIcon={<Shield className="size-4" />}>
+                      Admin
+                    </Button>
+                  </Link>
+                )}
                 <Link to="/profile" onClick={() => setMobileOpen(false)}>
                   <Button variant="outline" fullWidth leftIcon={<User className="size-4" />}>
                     {user?.displayName}

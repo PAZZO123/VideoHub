@@ -27,9 +27,10 @@
     "db:seed:demo": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/seed-demo.ts",
     "db:verify:agegate": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-age-gate.ts",
     "db:verify:trending": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-trending.ts",
-    "db:verify:all": "npm run db:verify && npm run db:verify:agegate && npm run db:verify:trending && npm run db:verify:downloads && npm run db:verify:ai",
+    "db:verify:all": "npm run db:verify && npm run db:verify:agegate && npm run db:verify:trending && npm run db:verify:downloads && npm run db:verify:ai && npm run db:verify:admin",
     "db:verify:downloads": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-downloads.ts",
-    "db:verify:ai": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-ai.ts"
+    "db:verify:ai": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-ai.ts",
+    "db:verify:admin": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-admin.ts"
   },
   "prisma": {
     "seed": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/seed.ts"
@@ -69,6 +70,7 @@
     "@types/compression": "^1.7.5",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
+    "@types/multer": "^2.2.0",
     "@types/node": "^22.9.0",
     "@types/passport-jwt": "^4.0.1",
     "@types/supertest": "^6.0.2",

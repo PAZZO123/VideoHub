@@ -4,7 +4,7 @@ A video and movie discovery platform: browse and search a catalogue, get AI reco
 
 Free for every user. No subscription, no payment system — but the data model carries a `UserPlan` enum so a premium tier can be added later without a migration that touches every row.
 
-> **Status:** Phases 1–5 complete and verified against a live Neon database.
+> **Status:** Phases 1–6 complete and verified against a live Neon database.
 > Later phases are tracked in [Roadmap](#roadmap).
 
 ---
@@ -26,6 +26,7 @@ Free for every user. No subscription, no payment system — but the data model c
 - [Movie metadata configuration](#movie-metadata-configuration)
 - [Testing](#testing)
 - [API documentation](#api-documentation)
+- [Uploads and moderation](#uploads-and-moderation)
 - [Security](#security)
 - [Deployment](#deployment)
 - [Roadmap](#roadmap)
@@ -326,6 +327,7 @@ npm run db:verify:all --workspace=@videohub/api
 | `db:verify:trending` | The scoring job ranks real rows and the manual trigger is admin-only |
 | `db:verify:downloads` | Protected platforms are refused with a reason and a source link; SSRF targets are blocked; an authorized public-domain file really transfers, stores, and is deleted with its record |
 | `db:verify:ai` | The assistant recommends only real catalogue titles, recommendations resolve to linkable records, conversations persist and stay private, and SSE actually streams |
+| `db:verify:admin` | Every admin route is closed to normal users, uploads are invisible until approved, rejections require a reason, and deactivation kills live sessions |
 
 Each creates its own namespaced fixtures and removes them again, so they are safe
 to run against a database that holds real content. `db:verify:agegate` and
@@ -457,7 +459,7 @@ live API before trusting a deployment:
 npm run db:verify:all --workspace=@videohub/api
 ```
 
-Current counts: **160 API unit tests**, **23 web tests**, **102 live checks**.
+Current counts: **190 API unit tests**, **23 web tests**, **132 live checks**.
 
 ## API documentation
 
@@ -474,6 +476,36 @@ Every response uses the same envelope:
 ```
 
 Error codes are exported from `@videohub/types` so the client branches on `code`, never on message text. Internal errors, stack traces and connection strings are never sent to clients.
+
+## Uploads and moderation
+
+Anyone signed in can upload a video, but nothing reaches the public catalogue
+unreviewed.
+
+1. The uploader must tick an explicit **rights confirmation**. It is validated
+   with `@Equals(true)` — a missing or falsy value is a validation failure, not a
+   silent default.
+2. The file is checked against **its own bytes**, not just the declared MIME
+   type. `Content-Type` comes from the browser and is trivially forged, so the
+   header is matched against known container signatures — an executable renamed
+   to `.mp4` is rejected before it is ever stored.
+3. The video is created `PENDING` and is excluded from every public query —
+   listing, detail, search and trending — until an admin approves it. The
+   uploader can still see their own submission and its status.
+4. A moderator approves or rejects. **Rejecting requires a reason**, which the
+   uploader sees, so "no" is always actionable.
+
+`downloadAllowed` on an upload is only honoured when the rights claim is also
+present — the service recomputes it rather than trusting the submitted flag.
+
+### Admin safety rails
+
+The admin surface refuses actions that would leave the platform unmanageable:
+
+- an admin cannot demote or deactivate **their own** account
+- the **last remaining** admin cannot be demoted
+- deactivating a user **revokes their refresh tokens immediately**, so access
+  ends at once rather than whenever the access token happens to expire
 
 ## Security
 
@@ -520,7 +552,7 @@ Designed to run at roughly $0/month on free tiers:
 | 3 | Watchlist, watch history, continue watching, profile | ✅ Complete |
 | 4 | URL downloader and source policy engine | ✅ Complete |
 | 5 | AI provider abstraction, chat, recommendation engine | ✅ Complete |
-| 6 | Admin dashboard, user uploads, moderation | Planned |
+| 6 | Admin dashboard, user uploads, moderation | ✅ Complete |
 | 7 | Animations, states, accessibility, performance, full test pass | Planned |
 
 ## License

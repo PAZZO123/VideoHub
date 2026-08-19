@@ -2,7 +2,6 @@ import { lazy } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/app-layout';
 import { ProtectedRoute } from '@/components/layout/protected-route';
-import { PlaceholderPage } from '@/pages/placeholder-page';
 
 // Route-level code splitting: the landing bundle stays small and each surface
 // is fetched only when it is first visited.
@@ -22,6 +21,8 @@ const ProfilePage = lazy(() => import('@/pages/profile-page'));
 const DownloadPage = lazy(() => import('@/pages/download-page'));
 const DownloadsPage = lazy(() => import('@/pages/downloads-page'));
 const AiPage = lazy(() => import('@/pages/ai-page'));
+const UploadPage = lazy(() => import('@/pages/upload-page'));
+const AdminPage = lazy(() => import('@/pages/admin-page'));
 const NotFoundPage = lazy(() => import('@/pages/not-found-page'));
 
 export function App(): JSX.Element {
@@ -82,10 +83,19 @@ export function App(): JSX.Element {
         <Route path="ai" element={<AiPage />} />
 
         <Route
+          path="upload"
+          element={
+            <ProtectedRoute>
+              <UploadPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="admin/*"
           element={
             <ProtectedRoute requireAdmin>
-              <PlaceholderPage title="Admin dashboard" phase="Phase 6" />
+              <AdminPage />
             </ProtectedRoute>
           }
         />

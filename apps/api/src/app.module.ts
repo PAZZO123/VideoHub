@@ -4,6 +4,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'node:path';
+import { AdminModule } from './admin/admin.controller';
 import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.controller';
@@ -15,6 +16,7 @@ import { MoviesModule } from './movies/movies.module';
 import { SearchModule } from './search/search.controller';
 import { TrendingModule } from './trending/trending.controller';
 import { StorageModule } from './storage/storage.module';
+import { UploadsModule } from './uploads/uploads.controller';
 import { VideosModule } from './videos/videos.module';
 import { WatchlistModule } from './watchlist/watchlist.controller';
 import { AgeVerificationGuard } from './common/guards/age-verification.guard';
@@ -62,6 +64,8 @@ import { UsersModule } from './users/users.module';
     HistoryModule,
     DownloadsModule,
     AiAgentModule,
+    UploadsModule,
+    AdminModule,
     HealthModule,
   ],
   providers: [
