@@ -6,6 +6,7 @@
  * removes them again.
  */
 import { PrismaClient, MaturityRating } from '@prisma/client';
+import { registerUser } from './verify-helpers';
 
 /** Loose envelope shape — these scripts assert on the wire format, not types. */
 interface Envelope {
@@ -53,10 +54,7 @@ const KIDS_SLUG = `kids-fixture-${stamp}`;
 
 async function makeUser(label: string, { verify = false, kidsMode = false } = {}): Promise<string> {
   const email = `${label}-${stamp}@verify.local`;
-  const reg = await call('POST', '/auth/register', {
-    body: { email, password: 'GateTest123', displayName: label },
-  });
-  let token: string = reg.json!.data.accessToken;
+  const token = await registerUser(email, label, 'GateTest123');
 
   if (verify) {
     await call('POST', '/auth/verify-age', {

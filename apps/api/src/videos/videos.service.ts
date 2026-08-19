@@ -29,7 +29,7 @@ export class VideosService {
   ): Promise<Paginated<VideoSummary>> {
     const where = this.buildWhere(query, context);
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await Promise.all([
       this.prisma.video.findMany({
         where,
         include: VIDEO_SUMMARY_INCLUDE,

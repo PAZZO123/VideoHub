@@ -150,7 +150,7 @@ export class DownloadsService {
   async findAll(userId: string, pagination: PaginationDto): Promise<Paginated<DownloadDto>> {
     const where = { userId };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await Promise.all([
       this.prisma.download.findMany({
         where,
         orderBy: { createdAt: 'desc' },

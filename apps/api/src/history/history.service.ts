@@ -36,7 +36,7 @@ export class HistoryService {
   ): Promise<ReturnType<typeof paginate<WatchHistoryItemDto>>> {
     const where = { userId };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await Promise.all([
       this.prisma.watchHistory.findMany({
         where,
         include: HISTORY_INCLUDE,

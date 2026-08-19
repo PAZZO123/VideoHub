@@ -109,7 +109,7 @@ export class SearchService {
       OR: [{ title: contains }, { description: contains }, { tags: { has: query.toLowerCase() } }],
     };
 
-    const [movies, totalMovies, videos, totalVideos] = await this.prisma.$transaction([
+    const [movies, totalMovies, videos, totalVideos] = await Promise.all([
       this.prisma.movie.findMany({
         where: movieWhere,
         include: MOVIE_SUMMARY_INCLUDE,

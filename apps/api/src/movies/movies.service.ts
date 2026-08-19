@@ -24,9 +24,11 @@ export class MoviesService {
   ): Promise<Paginated<MovieSummary>> {
     const where = this.buildWhere(query, context);
 
-    // One round trip for both the page and the count. Prisma batches these into
-    // a single transaction rather than two sequential queries.
-    const [items, total] = await this.prisma.$transaction([
+    // Issued together rather than sequentially. Deliberately NOT $transaction:
+    // a read-only list+count needs no atomicity, and a transaction would pin a
+    // pooled connection for BEGIN..COMMIT, which exhausts Neon's pooler as soon
+    // as several of these run concurrently.
+    const [items, total] = await Promise.all([
       this.prisma.movie.findMany({
         where,
         include: MOVIE_SUMMARY_INCLUDE,

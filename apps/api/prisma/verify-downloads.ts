@@ -8,6 +8,7 @@
  *   npm run db:verify:downloads --workspace=@videohub/api
  */
 import { PrismaClient } from '@prisma/client';
+import { registerUser } from './verify-helpers';
 
 const BASE = 'http://localhost:3000/api';
 const prisma = new PrismaClient();
@@ -142,10 +143,7 @@ async function main(): Promise<void> {
   console.log('\ndownload records');
   const stamp = Date.now();
   const email = `dl-${stamp}@verify.local`;
-  const reg = await call('POST', '/auth/register', {
-    body: { email, password: 'DownloadTest123', displayName: 'Download Verifier' },
-  });
-  const token: string = reg.json!.data.accessToken;
+  const token = await registerUser(email, 'Download Verifier', 'DownloadTest123');
 
   const anon = await call('POST', '/downloads', { body: { url: REAL_FILE } });
   check('starting a download requires an account', anon.status === 401);
@@ -167,14 +165,12 @@ async function main(): Promise<void> {
   const list = await call('GET', '/downloads', { token });
   check('the blocked attempt appears in the list', list.json?.data?.items?.length === 1);
 
-  const otherUser = await call('POST', '/auth/register', {
-    body: { email: `other-${stamp}@verify.local`, password: 'DownloadTest123', displayName: 'Other' },
-  });
-  const otherList = await call('GET', '/downloads', { token: otherUser.json!.data.accessToken });
+  const otherToken = await registerUser(`other-${stamp}@verify.local`, 'Other', 'DownloadTest123');
+  const otherList = await call('GET', '/downloads', { token: otherToken });
   check("another user cannot see someone else's downloads", otherList.json?.data?.items?.length === 0);
 
   const foreign = await call('GET', `/downloads/${blocked.json!.data.id}`, {
-    token: otherUser.json!.data.accessToken,
+    token: otherToken,
   });
   check('fetching another user’s download 404s', foreign.status === 404, foreign.json?.code);
 

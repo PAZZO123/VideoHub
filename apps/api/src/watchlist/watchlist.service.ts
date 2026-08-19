@@ -56,6 +56,8 @@ export class WatchlistService {
     // a double-tap should not produce a 409.
     if (existing) return this.toDto(existing);
 
+    // Genuinely transactional, unlike the read-only list queries elsewhere: the
+    // row and the trending counter must move together, or the count drifts.
     const [item] = await this.prisma.$transaction([
       this.prisma.watchlistItem.create({
         data: {
