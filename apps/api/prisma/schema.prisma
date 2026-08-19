@@ -1,0 +1,510 @@
+// VideoHub database schema
+// PostgreSQL (Neon). Metadata only — media bytes live in object storage and are
+// referenced here by URL / storage key. Never store media blobs in this DB.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Pooled connection for the running app (Neon PgBouncer endpoint).
+  url = env("DATABASE_URL")
+  // Direct (unpooled) connection — Prisma Migrate requires it on Neon.
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+/// No payment system exists yet; every account is FREE. Present so a premium
+/// tier can be added later without migrating every user row.
+enum UserPlan {
+  FREE
+  PREMIUM
+}
+
+enum MaturityRating {
+  KIDS
+  GENERAL
+  TEEN
+  MATURE
+  ADULT
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MediaKind {
+  MOVIE
+  VIDEO
+}
+
+enum SourceAccess {
+  FREE_STREAM
+  SUBSCRIPTION
+  RENT
+  BUY
+  PUBLIC_DOMAIN
+  LICENSED_DOWNLOAD
+}
+
+enum DownloadStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  BLOCKED
+}
+
+enum DownloadRefusalReason {
+  HOST_NOT_ALLOWED
+  PROTECTED_CONTENT
+  REQUIRES_AUTH
+  PAYWALLED
+  ROBOTS_DISALLOWED
+  UNSUPPORTED_URL
+  TOO_LARGE
+}
+
+enum AIRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum RecommendationSource {
+  TRENDING
+  SIMILARITY
+  PREFERENCE
+  AI
+}
+
+// ---------------------------------------------------------------------------
+// Users & auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  avatarUrl    String?
+  role         UserRole @default(USER)
+  plan         UserPlan @default(FREE)
+
+  /// Set only after the 18+ verification flow completes. Gates ADULT content.
+  ageVerified   Boolean   @default(false)
+  ageVerifiedAt DateTime?
+  dateOfBirth   DateTime?
+
+  /// When true the API only ever returns KIDS-rated content to this user.
+  kidsMode          Boolean @default(false)
+  preferredLanguage String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens   RefreshToken[]
+  watchlist       WatchlistItem[]
+  watchHistory    WatchHistory[]
+  downloads       Download[]
+  searchHistory   SearchHistory[]
+  conversations   AIConversation[]
+  uploadedVideos  Video[]          @relation("VideoUploader")
+  recommendations Recommendation[]
+
+  @@index([role])
+  @@index([createdAt])
+  @@map("users")
+}
+
+/// Hashed refresh tokens. Storing the hash means a DB leak cannot be replayed
+/// as a valid session.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Taxonomy
+// ---------------------------------------------------------------------------
+
+model Genre {
+  id   String @id @default(cuid())
+  name String @unique
+  slug String @unique
+
+  movies MovieGenre[]
+
+  @@map("genres")
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  description String?
+  /// Marks the Ibitente / kids tree, which drives the playful child UI.
+  isKids      Boolean @default(false)
+  iconEmoji   String?
+  colorHex    String?
+  sortOrder   Int     @default(0)
+
+  videos Video[]
+
+  @@index([isKids])
+  @@map("categories")
+}
+
+// ---------------------------------------------------------------------------
+// Movies
+// ---------------------------------------------------------------------------
+
+model Movie {
+  id      String  @id @default(cuid())
+  slug    String  @unique
+  title   String
+  tagline String?
+  /// Long synopsis.
+  overview String? @db.Text
+
+  posterUrl   String?
+  backdropUrl String?
+  trailerUrl  String?
+
+  releaseDate    DateTime?
+  releaseYear    Int?
+  runtimeMinutes Int?
+  /// 0–10 aggregate score.
+  rating         Float?
+  ratingCount    Int            @default(0)
+  language       String?
+  originalTitle  String?
+  director       String?
+  maturityRating MaturityRating @default(GENERAL)
+
+  /// External provider identity, so a metadata sync can upsert idempotently.
+  externalId       String?
+  externalProvider String?
+
+  viewCount     Int   @default(0)
+  searchCount   Int   @default(0)
+  watchlistAdds Int   @default(0)
+  popularity    Float @default(0)
+  /// Recomputed by the scheduled trending job — never written by request paths.
+  trendingScore Float @default(0)
+
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  genres          MovieGenre[]
+  cast            CastMember[]
+  sources         Source[]
+  watchlistItems  WatchlistItem[]
+  watchHistory    WatchHistory[]
+  recommendations Recommendation[]
+
+  @@unique([externalProvider, externalId], name: "movie_external_identity")
+  @@index([title])
+  @@index([trendingScore(sort: Desc)])
+  @@index([popularity(sort: Desc)])
+  @@index([rating(sort: Desc)])
+  @@index([releaseYear])
+  @@index([maturityRating])
+  @@index([isPublished, trendingScore(sort: Desc)])
+  @@map("movies")
+}
+
+/// Explicit join table so the pairing can carry its own index.
+model MovieGenre {
+  movieId String
+  genreId String
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  genre Genre @relation(fields: [genreId], references: [id], onDelete: Cascade)
+
+  @@id([movieId, genreId])
+  @@index([genreId])
+  @@map("movie_genres")
+}
+
+model CastMember {
+  id        String  @id @default(cuid())
+  movieId   String
+  name      String
+  character String?
+  order     Int     @default(0)
+  photoUrl  String?
+
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@index([movieId])
+  @@index([name])
+  @@map("cast_members")
+}
+
+// ---------------------------------------------------------------------------
+// Videos
+// ---------------------------------------------------------------------------
+
+model Video {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  title       String
+  description String? @db.Text
+
+  thumbnailUrl    String?
+  /// Streamable URL. For uploads this is resolved from storageKey at read time.
+  playbackUrl     String?
+  /// WebVTT captions track, when the uploader supplied one.
+  captionsUrl     String?
+  captionsLabel   String?
+  /// Object-storage key. The bytes never live in Postgres.
+  storageKey      String?
+  durationSeconds Int?
+  language        String?
+  tags            String[] @default([])
+
+  maturityRating MaturityRating @default(GENERAL)
+  /// Uploads stay hidden from public search until an admin approves them.
+  moderationStatus ModerationStatus @default(PENDING)
+  moderationNote   String?
+  moderatedAt      DateTime?
+
+  /// True only when the rights holder confirmed download rights.
+  downloadAllowed Boolean @default(false)
+  rightsConfirmed Boolean @default(false)
+
+  viewCount     Int   @default(0)
+  searchCount   Int   @default(0)
+  watchlistAdds Int   @default(0)
+  trendingScore Float @default(0)
+
+  categoryId String?
+  uploaderId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category       Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  uploader       User?           @relation("VideoUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+  sources        Source[]
+  watchlistItems WatchlistItem[]
+  watchHistory   WatchHistory[]
+
+  @@index([title])
+  @@index([categoryId])
+  @@index([uploaderId])
+  @@index([moderationStatus])
+  @@index([trendingScore(sort: Desc)])
+  @@index([moderationStatus, trendingScore(sort: Desc)])
+  @@map("videos")
+}
+
+// ---------------------------------------------------------------------------
+// Sources — where a title can legitimately be watched or downloaded
+// ---------------------------------------------------------------------------
+
+model Source {
+  id       String       @id @default(cuid())
+  platform String
+  url      String
+  access   SourceAccess @default(FREE_STREAM)
+  region   String?
+  /// Whether VideoHub may serve a download. Set from the licence only — this
+  /// flag never implies circumventing a technical protection.
+  downloadAllowed Boolean @default(false)
+  qualityLabel    String?
+  licenseNote     String?
+
+  movieId String?
+  videoId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([movieId])
+  @@index([videoId])
+  @@index([platform])
+  @@map("sources")
+}
+
+// ---------------------------------------------------------------------------
+// User activity
+// ---------------------------------------------------------------------------
+
+model WatchlistItem {
+  id      String    @id @default(cuid())
+  userId  String
+  kind    MediaKind
+  movieId String?
+  videoId String?
+
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@unique([userId, videoId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("watchlist_items")
+}
+
+model WatchHistory {
+  id      String    @id @default(cuid())
+  userId  String
+  kind    MediaKind
+  movieId String?
+  videoId String?
+
+  progressSeconds Int      @default(0)
+  durationSeconds Int?
+  completed       Boolean  @default(false)
+  startedAt       DateTime @default(now())
+  lastWatchedAt   DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie? @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  video Video? @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@unique([userId, videoId])
+  @@index([userId, lastWatchedAt(sort: Desc)])
+  @@map("watch_history")
+}
+
+model SearchHistory {
+  id     String  @id @default(cuid())
+  userId String?
+  query  String
+  /// Result count at the time of search — feeds "searches" in trending.
+  resultCount Int @default(0)
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([query])
+  @@index([createdAt])
+  @@map("search_history")
+}
+
+// ---------------------------------------------------------------------------
+// Downloads
+// ---------------------------------------------------------------------------
+
+model Download {
+  id        String @id @default(cuid())
+  userId    String
+  sourceUrl String
+  host      String
+
+  title         String?
+  thumbnailUrl  String?
+  format        String?
+  fileSizeBytes BigInt?
+  /// Object-storage key of the fetched file, when one was produced.
+  storageKey    String?
+
+  status         DownloadStatus         @default(PENDING)
+  /// Populated when status is BLOCKED. Explains the refusal to the user.
+  refusalReason  DownloadRefusalReason?
+  message        String?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@map("downloads")
+}
+
+// ---------------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------------
+
+model AIConversation {
+  id     String @id @default(cuid())
+  userId String
+  title  String @default("New conversation")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String @id @default(cuid())
+  conversationId String
+  role           AIRole
+  content        String @db.Text
+
+  /// Resolved recommendation payload (AIRecommendationDto[]) rendered as cards.
+  recommendations Json?
+  /// Which provider produced this message, for debugging and cost attribution.
+  provider        String?
+  tokensUsed      Int?
+
+  createdAt DateTime @default(now())
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+/// Cached recommendation rows so the home page does not recompute per request.
+model Recommendation {
+  id      String               @id @default(cuid())
+  userId  String
+  movieId String
+  score   Float
+  source  RecommendationSource
+  reason  String
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId, source])
+  @@index([userId, score(sort: Desc)])
+  @@index([expiresAt])
+  @@map("recommendations")
+}

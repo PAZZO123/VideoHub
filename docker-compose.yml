@@ -1,0 +1,33 @@
+# Local PostgreSQL for offline development.
+#
+# Production uses Neon (serverless Postgres, free tier) — this file exists so the
+# app can run without a network connection. Point DATABASE_URL and DIRECT_URL at
+# the service below when using it:
+#
+#   DATABASE_URL="postgresql://videohub:videohub@localhost:5432/videohub"
+#   DIRECT_URL="postgresql://videohub:videohub@localhost:5432/videohub"
+#
+#   docker compose up -d
+#   npm run prisma:migrate
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: videohub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: videohub
+      POSTGRES_PASSWORD: videohub
+      POSTGRES_DB: videohub
+    ports:
+      - '5432:5432'
+    volumes:
+      - videohub-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U videohub -d videohub']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  videohub-pgdata:

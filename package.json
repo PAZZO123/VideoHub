@@ -1,0 +1,33 @@
+{
+  "name": "videohub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "VideoHub — video & movie discovery, authorized downloads, and an AI recommendation agent.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all --parallel dev:api dev:web",
+    "dev:api": "npm run dev --workspace=@videohub/api",
+    "dev:web": "npm run dev --workspace=@videohub/web",
+    "build": "npm run build --workspace=@videohub/types && npm run build --workspace=@videohub/config && npm run build --workspace=@videohub/api && npm run build --workspace=@videohub/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "prisma:generate": "npm run prisma:generate --workspace=@videohub/api",
+    "prisma:migrate": "npm run prisma:migrate --workspace=@videohub/api",
+    "prisma:push": "npm run prisma:push --workspace=@videohub/api",
+    "prisma:studio": "npm run prisma:studio --workspace=@videohub/api",
+    "db:seed": "npm run db:seed --workspace=@videohub/api"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.3.3",
+    "typescript": "^5.6.3"
+  }
+}
