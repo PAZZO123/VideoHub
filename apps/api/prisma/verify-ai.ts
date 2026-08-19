@@ -8,6 +8,7 @@
  *   npm run db:verify:ai --workspace=@videohub/api
  */
 import { PrismaClient } from '@prisma/client';
+import { registerUser } from './verify-helpers';
 
 const BASE = 'http://localhost:3000/api';
 const prisma = new PrismaClient();
@@ -50,10 +51,7 @@ async function main(): Promise<void> {
 
   const stamp = Date.now();
   const email = `ai-${stamp}@verify.local`;
-  const reg = await call('POST', '/auth/register', {
-    body: { email, password: 'AiTest12345', displayName: 'AI Verifier' },
-  });
-  const token: string = reg.json!.data.accessToken;
+  const token = await registerUser(email, 'AI Verifier', 'AiTest12345');
 
   const catalogue = await prisma.movie.findMany({
     where: { isPublished: true },
@@ -127,10 +125,7 @@ async function main(): Promise<void> {
   );
 
   console.log('\nprivacy');
-  const other = await call('POST', '/auth/register', {
-    body: { email: `ai-other-${stamp}@verify.local`, password: 'AiTest12345', displayName: 'Other' },
-  });
-  const otherToken: string = other.json!.data.accessToken;
+  const otherToken = await registerUser(`ai-other-${stamp}@verify.local`, 'Other', 'AiTest12345');
 
   const foreign = await call('GET', `/ai/conversations/${conversationId}`, { token: otherToken });
   check('another user cannot read the conversation', foreign.status === 404, foreign.json?.code);

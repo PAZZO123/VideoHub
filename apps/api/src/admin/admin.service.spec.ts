@@ -79,7 +79,12 @@ describe('AdminService', () => {
       genre: { findMany: jest.fn().mockResolvedValue([]) },
       download: { count: jest.fn().mockResolvedValue(0) },
       searchHistory: { count: jest.fn().mockResolvedValue(0) },
-      $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
+      // Throws on purpose. Read paths must use Promise.all, not $transaction:
+      // a transaction pins a pooled connection and Neon's pooler runs out under
+      // concurrency. Mocking it as Promise.all is what hid this bug originally.
+      $transaction: jest.fn(() => {
+        throw new Error('$transaction must not be used for read-only queries');
+      }),
     };
 
     moduleRef = await Test.createTestingModule({

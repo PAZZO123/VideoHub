@@ -27,10 +27,11 @@
     "db:seed:demo": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/seed-demo.ts",
     "db:verify:agegate": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-age-gate.ts",
     "db:verify:trending": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-trending.ts",
-    "db:verify:all": "npm run db:verify && npm run db:verify:agegate && npm run db:verify:trending && npm run db:verify:downloads && npm run db:verify:ai && npm run db:verify:admin",
+    "db:verify:all": "npm run db:clean:fixtures && npm run db:verify && npm run db:verify:agegate && npm run db:verify:trending && npm run db:verify:downloads && npm run db:verify:ai && npm run db:verify:admin",
     "db:verify:downloads": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-downloads.ts",
     "db:verify:ai": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-ai.ts",
-    "db:verify:admin": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-admin.ts"
+    "db:verify:admin": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-admin.ts",
+    "db:clean:fixtures": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/clean-fixtures.ts"
   },
   "prisma": {
     "seed": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/seed.ts"

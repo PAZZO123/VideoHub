@@ -8,6 +8,7 @@
  *   npm run db:verify:trending --workspace=@videohub/api
  */
 import { PrismaClient } from '@prisma/client';
+import { registerUser } from './verify-helpers';
 
 const BASE = 'http://localhost:3000/api';
 const prisma = new PrismaClient();
@@ -51,10 +52,7 @@ async function main(): Promise<void> {
   const stamp = Date.now();
   const email = `trend-${stamp}@verify.local`;
 
-  const reg = await call('POST', '/auth/register', {
-    body: { email, password: 'TrendTest123', displayName: 'Trend Verifier' },
-  });
-  const token: string = reg.json!.data.accessToken;
+  const token = await registerUser(email, 'Trend Verifier', 'TrendTest123');
 
   const denied = await call('POST', '/trending/recalculate', { token });
   check('a normal user cannot trigger the recalculation', denied.status === 403, denied.json?.code);

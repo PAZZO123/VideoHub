@@ -44,8 +44,9 @@ export class AdminService {
   // --- dashboard ------------------------------------------------------------
 
   async getStats(): Promise<AdminStatsDto> {
-    // One transaction so the numbers on the dashboard are mutually consistent
-    // rather than sampled at slightly different moments.
+    // Issued in parallel. Not a transaction: the counts being microseconds
+    // apart does not matter on a dashboard, and pinning a pooled connection for
+    // eight queries is not worth that.
     const [
       totalUsers,
       totalMovies,
@@ -55,7 +56,7 @@ export class AdminService {
       pendingModeration,
       mostViewed,
       trending,
-    ] = await this.prisma.$transaction([
+    ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.movie.count(),
       this.prisma.video.count(),
@@ -194,7 +195,7 @@ export class AdminService {
   async moderationQueue(query: ModerationQueryDto): Promise<Paginated<VideoSummary>> {
     const where = { moderationStatus: query.status ?? ModerationStatus.PENDING };
 
-    const [items, total] = await this.prisma.$transaction([
+    const [items, total] = await Promise.all([
       this.prisma.video.findMany({
         where,
         include: VIDEO_SUMMARY_INCLUDE,
@@ -260,7 +261,7 @@ export class AdminService {
         }
       : {};
 
-    const [users, total] = await this.prisma.$transaction([
+    const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
         // Counts come from the relation, so this stays one query rather than
