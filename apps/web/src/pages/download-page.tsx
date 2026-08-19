@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
 import { ApiRequestError } from '@/lib/api-client';
 import { downloadsService, formatBytes } from '@/services/downloads.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 /** Refusal panel. States the reason plainly and always offers the source link. */
 function RefusalPanel({ analysis }: { analysis: DownloadAnalysis }): JSX.Element {
@@ -125,6 +126,7 @@ function PermittedPanel({
 }
 
 export default function DownloadPage(): JSX.Element {
+  usePageTitle('Download');
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [url, setUrl] = useState('');

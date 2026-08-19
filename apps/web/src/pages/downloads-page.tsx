@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/states';
 import { cn } from '@/lib/cn';
 import { downloadsService, formatBytes } from '@/services/downloads.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 const STATUS_STYLE: Record<DownloadStatus, { label: string; className: string; icon: JSX.Element }> = {
   PENDING: {
@@ -124,6 +125,7 @@ function DownloadRow({
 }
 
 export default function DownloadsPage(): JSX.Element {
+  usePageTitle('Your Downloads');
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
 

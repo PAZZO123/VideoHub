@@ -4,8 +4,10 @@ import { MovieCard, VideoCard } from '@/components/media/media-card';
 import { MediaGrid } from '@/components/media/media-rail';
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/states';
 import { trendingService } from '@/services/catalog.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export default function TrendingPage(): JSX.Element {
+  usePageTitle('Trending');
   const { data, isPending, isError, refetch } = useQuery({
     queryKey: ['trending', 40],
     queryFn: () => trendingService.list(40),

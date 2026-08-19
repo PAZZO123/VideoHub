@@ -24,7 +24,14 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: ReactNode }): JSX.Element {
     return (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+        <MemoryRouter
+          initialEntries={[route]}
+          // Match the app's router config so tests exercise the same behaviour
+          // (and do not emit upgrade warnings the app has already opted out of).
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          {children}
+        </MemoryRouter>
       </QueryClientProvider>
     );
   }

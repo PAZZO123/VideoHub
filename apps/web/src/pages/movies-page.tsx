@@ -8,8 +8,10 @@ import { Pagination } from '@/components/media/pagination';
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/states';
 import { moviesService } from '@/services/catalog.service';
 import { taxonomyService } from '@/services/catalog.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export default function MoviesPage(): JSX.Element {
+  usePageTitle('Movies');
   // The URL is the source of truth for filters, so a filtered view is
   // shareable, bookmarkable and survives a back-navigation.
   const [searchParams, setSearchParams] = useSearchParams();

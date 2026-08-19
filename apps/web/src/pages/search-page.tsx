@@ -8,8 +8,10 @@ import { MediaGrid } from '@/components/media/media-rail';
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/states';
 import { useDebounce } from '@/hooks/use-debounce';
 import { searchService } from '@/services/catalog.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export default function SearchPage(): JSX.Element {
+  usePageTitle('Search');
   const [searchParams, setSearchParams] = useSearchParams();
   const urlQuery = searchParams.get('q') ?? '';
 

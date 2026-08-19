@@ -10,6 +10,7 @@ import { ApiRequestError } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
 import { taxonomyService } from '@/services/catalog.service';
 import { uploadsService } from '@/services/admin.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 const STATUS_STYLE: Record<ModerationStatus, { label: string; className: string; icon: JSX.Element }> = {
   PENDING: {
@@ -30,6 +31,7 @@ const STATUS_STYLE: Record<ModerationStatus, { label: string; className: string;
 };
 
 export default function UploadPage(): JSX.Element {
+  usePageTitle('Upload a Video');
   const queryClient = useQueryClient();
 
   const [file, setFile] = useState<File | null>(null);

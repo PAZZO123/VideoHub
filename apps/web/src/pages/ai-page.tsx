@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/cn';
 import { aiService } from '@/services/ai.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 /** A recommendation the assistant made, resolved to a real catalogue record. */
 function RecommendationCard({ item }: { item: AIRecommendationDto }): JSX.Element {
@@ -113,6 +114,7 @@ function MessageBubble({
 }
 
 export default function AiPage(): JSX.Element {
+  usePageTitle('VideoHub AI');
   const { isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();

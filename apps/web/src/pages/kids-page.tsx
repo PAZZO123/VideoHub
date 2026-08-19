@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { taxonomyService, videosService } from '@/services/catalog.service';
 import { cn } from '@/lib/cn';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 /**
  * Ibitente — the kids surface.
@@ -71,6 +72,7 @@ function KidVideoCard({ video, index }: { video: VideoSummary; index: number }):
 }
 
 export default function KidsPage(): JSX.Element {
+  usePageTitle('Ibitente');
   const [activeCategory, setActiveCategory] = useState<string | undefined>(undefined);
 
   const { data: categories } = useQuery({

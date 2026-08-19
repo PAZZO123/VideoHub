@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
 import { ApiRequestError } from '@/lib/api-client';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthShell } from './auth-shell';
 
 export default function LoginPage(): JSX.Element {
+  usePageTitle('Sign In');
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

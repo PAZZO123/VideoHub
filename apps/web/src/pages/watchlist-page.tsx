@@ -6,8 +6,10 @@ import { MediaGrid } from '@/components/media/media-rail';
 import { Button } from '@/components/ui/button';
 import { CardSkeleton, EmptyState, ErrorState } from '@/components/ui/states';
 import { watchlistService } from '@/services/library.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export default function WatchlistPage(): JSX.Element {
+  usePageTitle('Your Watchlist');
   const queryClient = useQueryClient();
 
   const { data, isPending, isError, refetch } = useQuery({

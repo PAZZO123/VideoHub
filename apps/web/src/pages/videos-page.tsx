@@ -7,8 +7,10 @@ import { Pagination } from '@/components/media/pagination';
 import { EmptyState, ErrorState } from '@/components/ui/states';
 import { cn } from '@/lib/cn';
 import { taxonomyService, videosService } from '@/services/catalog.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 export default function VideosPage(): JSX.Element {
+  usePageTitle('Videos');
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get('page') ?? '1');

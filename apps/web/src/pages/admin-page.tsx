@@ -22,6 +22,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { useDebounce } from '@/hooks/use-debounce';
 import { cn } from '@/lib/cn';
 import { adminService } from '@/services/admin.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 // --- dashboard ---------------------------------------------------------------
 
@@ -155,7 +156,13 @@ function ModerationRow({ video }: { video: VideoSummary }): JSX.Element {
       <div className="flex items-start gap-4">
         <div className="h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-ink-800">
           {video.thumbnailUrl ? (
-            <img src={video.thumbnailUrl} alt="" className="size-full object-cover" />
+            <img
+              src={video.thumbnailUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover"
+            />
           ) : (
             <div className="grid size-full place-items-center">
               <Video className="size-5 text-ink-500" aria-hidden="true" />
@@ -541,6 +548,7 @@ const TABS = [
 ];
 
 export default function AdminPage(): JSX.Element {
+  usePageTitle('Admin');
   return (
     <div className="mx-auto max-w-[1400px] px-4 pb-20 pt-28 sm:px-6 lg:px-10">
       <header>

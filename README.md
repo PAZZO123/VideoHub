@@ -4,7 +4,7 @@ A video and movie discovery platform: browse and search a catalogue, get AI reco
 
 Free for every user. No subscription, no payment system — but the data model carries a `UserPlan` enum so a premium tier can be added later without a migration that touches every row.
 
-> **Status:** Phases 1–6 complete and verified against a live Neon database.
+> **Status:** All seven phases complete and verified against a live Neon database.
 > Later phases are tracked in [Roadmap](#roadmap).
 
 ---
@@ -27,6 +27,7 @@ Free for every user. No subscription, no payment system — but the data model c
 - [Testing](#testing)
 - [API documentation](#api-documentation)
 - [Uploads and moderation](#uploads-and-moderation)
+- [Resilience and accessibility](#resilience-and-accessibility)
 - [Security](#security)
 - [Deployment](#deployment)
 - [Roadmap](#roadmap)
@@ -459,7 +460,8 @@ live API before trusting a deployment:
 npm run db:verify:all --workspace=@videohub/api
 ```
 
-Current counts: **190 API unit tests**, **23 web tests**, **132 live checks**.
+Current counts: **190 API unit tests**, **38 web tests**, **121 live checks**
+(`db:verify:all`).
 
 ## API documentation
 
@@ -507,6 +509,26 @@ The admin surface refuses actions that would leave the platform unmanageable:
 - deactivating a user **revokes their refresh tokens immediately**, so access
   ends at once rather than whenever the access token happens to expire
 
+## Resilience and accessibility
+
+Things a single-page app has to do deliberately, because the browser does them
+for free on a full page load:
+
+| Concern | How it is handled |
+|---|---|
+| A render crash | Two `ErrorBoundary` layers — one around the route outlet so a broken page keeps the navigation around it, one at the root for anything above. Without them a single thrown error leaves a blank page with nothing to act on. |
+| Navigation | Scroll resets, focus moves to `<main>` so the next Tab starts at the top of the new page, and the new title is announced to screen readers via a polite live region. |
+| Page identity | Every route sets a document title, which is both the browser tab and what the route announcer reads. |
+| Motion | `prefers-reduced-motion` disables animation globally and switches scrolling from smooth to instant. |
+| Keyboard | A skip link is the first tab stop; focus rings are never removed; icon-only controls all carry an accessible name. |
+| Async state | Every data surface has explicit loading, empty and error states — an empty rail removes itself rather than rendering a bare heading. |
+
+### Bundle
+
+Every route is lazy-loaded and every icon is split individually, so the initial
+load is roughly **104 kB gzipped** (React, TanStack Query, the shell and the
+homepage) and no single page chunk exceeds 15 kB.
+
 ## Security
 
 | Concern | How it is handled |
@@ -553,7 +575,7 @@ Designed to run at roughly $0/month on free tiers:
 | 4 | URL downloader and source policy engine | ✅ Complete |
 | 5 | AI provider abstraction, chat, recommendation engine | ✅ Complete |
 | 6 | Admin dashboard, user uploads, moderation | ✅ Complete |
-| 7 | Animations, states, accessibility, performance, full test pass | Planned |
+| 7 | Animations, states, accessibility, performance, full test pass | ✅ Complete |
 
 ## License
 

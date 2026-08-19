@@ -7,6 +7,7 @@ import { Pagination } from '@/components/media/pagination';
 import { Button } from '@/components/ui/button';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/states';
 import { historyService } from '@/services/library.service';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 function HistoryRow({
   item,
@@ -80,6 +81,7 @@ function HistoryRow({
 }
 
 export default function HistoryPage(): JSX.Element {
+  usePageTitle('Watch History');
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [confirmingClear, setConfirmingClear] = useState(false);

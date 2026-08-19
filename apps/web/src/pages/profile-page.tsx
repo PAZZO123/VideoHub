@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
 import { ApiRequestError } from '@/lib/api-client';
 import { cn } from '@/lib/cn';
+import { usePageTitle } from '@/hooks/use-page-title';
 
 function Section({
   title,
@@ -112,6 +113,7 @@ function AgeVerificationForm(): JSX.Element {
 }
 
 export default function ProfilePage(): JSX.Element {
+  usePageTitle('Your Profile');
   const { user, updateProfile, logout } = useAuth();
   const navigate = useNavigate();
 

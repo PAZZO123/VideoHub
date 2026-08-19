@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/use-auth';
 import { ApiRequestError } from '@/lib/api-client';
+import { usePageTitle } from '@/hooks/use-page-title';
 import { AuthShell } from './auth-shell';
 
 export default function RegisterPage(): JSX.Element {
+  usePageTitle('Create Account');
   const { register } = useAuth();
   const navigate = useNavigate();
 
