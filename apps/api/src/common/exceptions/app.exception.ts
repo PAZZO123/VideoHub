@@ -39,4 +39,12 @@ export class AppException extends HttpException {
   ): AppException {
     return new AppException(code, message, HttpStatus.BAD_REQUEST, details);
   }
+
+  /**
+   * A dependency we rely on is down but the request itself was fine — the
+   * caller should retry rather than change anything.
+   */
+  static serviceUnavailable(code: ErrorCode, message: string): AppException {
+    return new AppException(code, message, HttpStatus.SERVICE_UNAVAILABLE);
+  }
 }

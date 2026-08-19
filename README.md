@@ -4,7 +4,7 @@ A video and movie discovery platform: browse and search a catalogue, get AI reco
 
 Free for every user. No subscription, no payment system — but the data model carries a `UserPlan` enum so a premium tier can be added later without a migration that touches every row.
 
-> **Status:** Phases 1–4 complete and verified against a live Neon database.
+> **Status:** Phases 1–5 complete and verified against a live Neon database.
 > Later phases are tracked in [Roadmap](#roadmap).
 
 ---
@@ -325,6 +325,7 @@ npm run db:verify:all --workspace=@videohub/api
 | `db:verify:agegate` | ADULT content is invisible to guests and unverified accounts across listing, detail, search, watchlist **and totals**; visible once verified; hidden again under Kids Mode |
 | `db:verify:trending` | The scoring job ranks real rows and the manual trigger is admin-only |
 | `db:verify:downloads` | Protected platforms are refused with a reason and a source link; SSRF targets are blocked; an authorized public-domain file really transfers, stores, and is deleted with its record |
+| `db:verify:ai` | The assistant recommends only real catalogue titles, recommendations resolve to linkable records, conversations persist and stay private, and SSE actually streams |
 
 Each creates its own namespaced fixtures and removes them again, so they are safe
 to run against a database that holds real content. `db:verify:agegate` and
@@ -386,7 +387,32 @@ ANTHROPIC_MODEL=claude-sonnet-5
 
 > **Note:** a Claude Pro subscription does **not** include API access. The Anthropic API is billed separately. Keep `mock` for development.
 
-Boot fails fast if you select a provider without its key. AI endpoints carry their own tighter rate limit (`AI_RATE_LIMIT_MAX`) so a public deployment cannot run up an unbounded bill.
+Boot fails fast if you select a provider without its key, and falls back to the
+mock at runtime if a key turns out to be missing — an unavailable model degrades
+the assistant rather than stopping the app from starting.
+
+AI endpoints carry their own tighter rate limit (`AI_RATE_LIMIT_MAX`) so a public
+deployment cannot run up an unbounded bill, and streaming is aborted the moment
+the client disconnects so an abandoned tab stops costing tokens.
+
+### How the assistant is kept honest
+
+The model is given the catalogue as context and instructed to recommend **only**
+from it. Titles it names are then resolved back against the database, so a
+recommendation that does not correspond to a real record never reaches the UI as
+a card. Inventing titles would send people looking for films that do not exist.
+
+The system prompt also forbids claiming anything is downloadable — the assistant
+does not know which sources permit it — and refuses to discuss bypassing DRM,
+paywalls, or access restrictions.
+
+### The recommendation engine
+
+`GET /ai/recommendations` makes **no AI call at all**. It blends trending, genre
+similarity and the user's own watchlist/history, weighted so preference beats
+similarity beats trending, and falls back to trending for guests and new
+accounts. That keeps the common case fast, free, and available to signed-out
+visitors; the model adds explanation on top rather than carrying the feature.
 
 ## Storage configuration
 
@@ -431,7 +457,7 @@ live API before trusting a deployment:
 npm run db:verify:all --workspace=@videohub/api
 ```
 
-Current counts: **149 API unit tests**, **23 web tests**, **76 live checks**.
+Current counts: **160 API unit tests**, **23 web tests**, **102 live checks**.
 
 ## API documentation
 
@@ -493,7 +519,7 @@ Designed to run at roughly $0/month on free tiers:
 | 2 | Movies, videos, search, categories, genres, trending, Ibitente | ✅ Complete |
 | 3 | Watchlist, watch history, continue watching, profile | ✅ Complete |
 | 4 | URL downloader and source policy engine | ✅ Complete |
-| 5 | AI provider abstraction, chat, recommendation engine | Planned |
+| 5 | AI provider abstraction, chat, recommendation engine | ✅ Complete |
 | 6 | Admin dashboard, user uploads, moderation | Planned |
 | 7 | Animations, states, accessibility, performance, full test pass | Planned |
 

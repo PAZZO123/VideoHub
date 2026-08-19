@@ -21,6 +21,7 @@ const HistoryPage = lazy(() => import('@/pages/history-page'));
 const ProfilePage = lazy(() => import('@/pages/profile-page'));
 const DownloadPage = lazy(() => import('@/pages/download-page'));
 const DownloadsPage = lazy(() => import('@/pages/downloads-page'));
+const AiPage = lazy(() => import('@/pages/ai-page'));
 const NotFoundPage = lazy(() => import('@/pages/not-found-page'));
 
 export function App(): JSX.Element {
@@ -78,7 +79,7 @@ export function App(): JSX.Element {
           }
         />
 
-        <Route path="ai" element={<PlaceholderPage title="VideoHub AI" phase="Phase 5" />} />
+        <Route path="ai" element={<AiPage />} />
 
         <Route
           path="admin/*"

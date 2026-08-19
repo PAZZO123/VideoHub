@@ -4,6 +4,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { join } from 'node:path';
+import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { AuthModule } from './auth/auth.module';
 import { CategoriesModule } from './categories/categories.controller';
 import { DownloadsModule } from './downloads/downloads.controller';
@@ -60,6 +61,7 @@ import { UsersModule } from './users/users.module';
     WatchlistModule,
     HistoryModule,
     DownloadsModule,
+    AiAgentModule,
     HealthModule,
   ],
   providers: [
