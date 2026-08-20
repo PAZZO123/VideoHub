@@ -2,6 +2,7 @@ import { Test, type TestingModule } from '@nestjs/testing';
 import { ModerationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogueSyncService } from './catalogue-sync.service';
+import { STORAGE_SERVICE } from '../storage/storage.interface';
 import { VIDEO_CATALOGUE_PROVIDER, type ExternalVideo } from './video-catalogue.interface';
 
 function externalVideo(overrides: Partial<ExternalVideo> = {}): ExternalVideo {
@@ -32,6 +33,7 @@ describe('CatalogueSyncService', () => {
     category: { findMany: jest.Mock };
   };
   let provider: { name: string; search: jest.Mock; getById: jest.Mock };
+  let storage: { name: string; upload: jest.Mock; exists: jest.Mock; getUrl: jest.Mock; delete: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -62,11 +64,40 @@ describe('CatalogueSyncService', () => {
       getById: jest.fn().mockResolvedValue(externalVideo()),
     };
 
+    storage = {
+      name: 'local',
+      upload: jest.fn().mockResolvedValue({
+        key: 'catalogue/ia-bigbuckbunny124.mp4',
+        sizeBytes: 40_000_000,
+        contentType: 'video/mp4',
+        url: 'http://localhost:3000/api/files/catalogue/ia-bigbuckbunny124.mp4',
+      }),
+      exists: jest.fn().mockResolvedValue(false),
+      getUrl: jest.fn().mockResolvedValue('http://localhost:3000/api/files/x.mp4'),
+      delete: jest.fn(),
+    };
+
+    // No test reaches the network; mirroring is exercised through this stub.
+    // A real ReadableStream, not a hand-rolled object: the service hands the
+    // body to Readable.fromWeb, which rejects anything else.
+    global.fetch = jest.fn().mockImplementation(async () => ({
+      ok: true,
+      status: 200,
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array([0, 0, 0, 0]));
+          controller.close();
+        },
+      }),
+      headers: new Map([['content-length', '40000000']]),
+    })) as unknown as typeof fetch;
+
     moduleRef = await Test.createTestingModule({
       providers: [
         CatalogueSyncService,
         { provide: PrismaService, useValue: prisma },
         { provide: VIDEO_CATALOGUE_PROVIDER, useValue: provider },
+        { provide: STORAGE_SERVICE, useValue: storage },
       ],
     }).compile();
 
@@ -152,6 +183,63 @@ describe('CatalogueSyncService', () => {
     });
   });
 
+  describe('mirroring', () => {
+    it('serves playback from our own storage once mirrored', async () => {
+      // The whole point: viewers should not wait on a slow third-party host.
+      await service.sync({ includeDiscovery: false, mirror: true, mirrorMaxMb: 500 });
+
+      const [args] = prisma.video.upsert.mock.calls[0];
+      expect(args.update.playbackUrl).not.toContain('archive.org');
+      expect(args.update.storageKey).toBe('catalogue/ia-bigbuckbunny124.mp4');
+    });
+
+    it('skips anything over the size cap instead of filling the disk', async () => {
+      provider.getById.mockResolvedValue(externalVideo({ sizeBytes: 900 * 1024 * 1024 }));
+
+      await service.sync({ includeDiscovery: false, mirror: true, mirrorMaxMb: 200 });
+
+      expect(storage.upload).not.toHaveBeenCalled();
+      const [args] = prisma.video.upsert.mock.calls[0];
+      expect(args.update.playbackUrl).toContain('archive.org');
+    });
+
+    it('refuses to mirror from a host that is not on the allowlist', async () => {
+      provider.getById.mockResolvedValue(
+        externalVideo({ playbackUrl: 'https://not-allowed.example.com/clip.mp4' }),
+      );
+
+      await service.sync({ includeDiscovery: false, mirror: true, mirrorMaxMb: 500 });
+
+      expect(storage.upload).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the provider URL when the mirror fails', async () => {
+      // A failed mirror must degrade to slower playback, never to a row with
+      // no source at all.
+      global.fetch = jest.fn().mockRejectedValue(new Error('ECONNRESET')) as unknown as typeof fetch;
+
+      const report = await service.sync({ includeDiscovery: false, mirror: true, mirrorMaxMb: 500 });
+
+      const [args] = prisma.video.upsert.mock.calls[0];
+      expect(args.update.playbackUrl).toContain('archive.org');
+      expect(report.mirrorFailed).toBeGreaterThan(0);
+    });
+
+    it('does not re-download something already mirrored', async () => {
+      // Re-running the sync must not pull hundreds of megabytes again.
+      prisma.video.findUnique.mockResolvedValue({
+        id: 'v1',
+        moderationStatus: 'APPROVED',
+        storageKey: 'catalogue/ia-bigbuckbunny124.mp4',
+      });
+      storage.exists.mockResolvedValue(true);
+
+      await service.sync({ includeDiscovery: false, mirror: true, mirrorMaxMb: 500 });
+
+      expect(storage.upload).not.toHaveBeenCalled();
+    });
+  });
+
   describe('resilience', () => {
     it('skips a curated title that vanished upstream instead of failing the run', async () => {
       provider.getById.mockResolvedValue(null);
@@ -169,6 +257,14 @@ describe('CatalogueSyncService', () => {
 
       expect(report.created).toBe(0);
       expect(prisma.video.upsert).not.toHaveBeenCalled();
+    });
+
+    it('leaves playbackUrl pointing at the provider when not mirroring', async () => {
+      await service.sync({ includeDiscovery: false });
+
+      const [args] = prisma.video.upsert.mock.calls[0];
+      expect(args.update.playbackUrl).toContain('archive.org');
+      expect(args.update).not.toHaveProperty('storageKey');
     });
 
     it('records the source page so provenance can be checked', async () => {

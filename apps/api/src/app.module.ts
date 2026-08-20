@@ -15,6 +15,7 @@ import { MovieMetadataModule } from './movie-metadata/movie-metadata.module';
 import { MoviesModule } from './movies/movies.module';
 import { SearchModule } from './search/search.controller';
 import { TrendingModule } from './trending/trending.controller';
+import { FilesModule } from './storage/files.controller';
 import { StorageModule } from './storage/storage.module';
 import { UploadsModule } from './uploads/uploads.controller';
 import { VideoCatalogueModule } from './video-catalogue/video-catalogue.module';
@@ -52,6 +53,7 @@ import { UsersModule } from './users/users.module';
     ScheduleModule.forRoot(),
     PrismaModule,
     StorageModule,
+    FilesModule,
     MovieMetadataModule,
     VideoCatalogueModule,
     AuthModule,

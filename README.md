@@ -461,6 +461,39 @@ The sync is idempotent: rows are keyed on `ia-<identifier>`, so re-running
 updates rather than duplicates, and it **never overwrites a moderation decision
 a human already made** — a rejected title stays rejected.
 
+### Playback speed: mirror the media
+
+Streaming straight from archive.org is slow for viewers. Measured from Kigali:
+
+| | first byte | throughput |
+|---|---|---|
+| archive.org | 4.6-8.7s | 77-153 KB/s |
+| mirrored to local storage | 0.22s | ~30 MB/s |
+
+Its storage nodes are in the US with no CDN in front of them, and the
+`/download/` URL costs an extra redirect hop (~1.6s) before any media arrives.
+The files are correctly faststart — the index really is at the front — so this
+is purely network distance, not container layout.
+
+```bash
+npm run db:sync:catalogue --workspace=@videohub/api -- --curated-only --mirror
+npm run db:sync:catalogue --workspace=@videohub/api -- --mirror --mirror-max-mb=500
+```
+
+`--mirror` copies each file once into `StorageService` and repoints
+`playbackUrl` at your own backend, so viewers never wait on a third party. It is
+streamed, never buffered, and skips anything over `--mirror-max-mb` (default
+200) so one feature film cannot fill the disk. A failed mirror falls back to the
+provider URL — slower playback, never a dead row — and a re-run does not
+re-download what is already mirrored.
+
+In production point `STORAGE_PROVIDER` at R2 or S3 so those bytes come off a CDN
+near the viewer.
+
+The player also uses `preload="none"`. With `preload="metadata"` the browser
+began fetching video the moment a page rendered, so opening any video page paid
+the full remote latency before the viewer had asked for anything.
+
 ### Why it is a curated list and not a search box
 
 The Internet Archive mixes librarian-curated collections with wide-open user
