@@ -138,6 +138,7 @@ Three things are deliberately swappable behind interfaces, so none of them can s
 |---|---|---|
 | `AIProvider` | mock, claude, openai, gemini | `AI_PROVIDER` |
 | `StorageService` | local, s3, r2, supabase | `STORAGE_PROVIDER` |
+| `VideoCatalogueProvider` | none, archive.org | `VIDEO_CATALOGUE_PROVIDER` |
 | `MovieMetadataProvider` | local, tmdb | `MOVIE_METADATA_PROVIDER` |
 
 **The database stores metadata only.** Media bytes live in object storage and are referenced by URL or storage key. Never put video blobs in Postgres — it will exhaust a Neon free tier immediately.
@@ -353,6 +354,7 @@ npm run dev
 | `npm test` | Jest (API) and Vitest (web) |
 | `npm run db:seed` | Seed genres, categories and an admin |
 | `npm run db:seed:demo --workspace=@videohub/api` | Optional public-domain demo content |
+| `npm run db:sync:catalogue --workspace=@videohub/api` | Pull real public-domain video from the Internet Archive |
 | `npm run db:verify:all --workspace=@videohub/api` | Live checks against a running API + database |
 
 ## Environment variables
@@ -368,6 +370,8 @@ Full list with comments in [`.env.example`](.env.example). The essentials:
 | `AI_PROVIDER` | `mock` \| `claude` \| `openai` \| `gemini` | `mock` |
 | `STORAGE_PROVIDER` | `local` \| `s3` \| `r2` \| `supabase` | `local` |
 | `MOVIE_METADATA_PROVIDER` | `local` \| `tmdb` | `local` |
+| `VIDEO_CATALOGUE_PROVIDER` | `none` \| `archive` — real public-domain video | `none` |
+| `MAX_UPLOAD_MB` | Upload ceiling in MB | `2048` (2 GB) |
 | `DOWNLOAD_ALLOWED_HOSTS` | Hosts the downloader may fetch from | built-in list |
 
 The environment is validated with Zod at boot, so a misconfiguration fails immediately with a readable message rather than at the first request. Never commit `.env`.
@@ -437,6 +441,57 @@ STORAGE_SECRET_KEY=...
 
 `tmdb` enables metadata sync where permitted. Set `TMDB_API_KEY`. External calls are made only on explicit sync, never per page view.
 
+## Real video catalogue
+
+`VIDEO_CATALOGUE_PROVIDER` controls where playable video comes from.
+
+| Value | Behaviour |
+| --- | --- |
+| `none` (default) | Your own uploads only. No third-party calls at all. |
+| `archive` | Pulls real, public-domain video from the Internet Archive. No API key. |
+
+```bash
+npm run db:sync:catalogue --workspace=@videohub/api
+
+# just the hand-checked titles, skipping bulk discovery
+npm run db:sync:catalogue --workspace=@videohub/api -- --curated-only
+```
+
+The sync is idempotent: rows are keyed on `ia-<identifier>`, so re-running
+updates rather than duplicates, and it **never overwrites a moderation decision
+a human already made** — a rejected title stays rejected.
+
+### Why it is a curated list and not a search box
+
+The Internet Archive mixes librarian-curated collections with wide-open user
+uploads. Probing the open ones while this was built returned, on the first page
+of results: an extremist music video, a short advertising its own nude scene, a
+film titled around child abuse, and several plainly copyrighted uploads. None of
+that can be allowed to appear automatically in a catalogue that also serves a
+children's section.
+
+So content arrives one of two ways, both defined in
+`packages/config/src/catalogue-sources.ts`:
+
+- **`FEATURED_VIDEOS`** — individually checked identifiers, each with a note
+  saying why it was cleared. These publish on sync.
+- **`DISCOVERY_QUERIES`** — curated collections only, and every result lands in
+  the moderation queue as `PENDING`. Same queue user uploads use, so there is
+  one review surface rather than two.
+
+Kids categories are never auto-published from a query. Public-domain animation
+of the 1930s–40s carries well-documented racial caricature that no title filter
+can detect, so the only titles published straight to Ibitente are the Blender
+open movies.
+
+There is deliberately no source for **African Cinema**. The Archive's
+public-domain African holdings are colonial-era travelogues shot by European
+crews; filing those under African Cinema would misrepresent both the films and
+the category. That shelf is for uploads.
+
+`downloadAllowed` is set from the stated licence only. An item with no licence
+is not downloadable, however reachable its file happens to be.
+
 ## Testing
 
 ```bash
@@ -499,6 +554,24 @@ unreviewed.
 
 `downloadAllowed` on an upload is only honoured when the rights claim is also
 present — the service recomputes it rather than trusting the submitted flag.
+
+### Upload size
+
+The ceiling is `MAX_UPLOAD_MB` (default 2048, i.e. 2 GB). Three things enforce it:
+
+- The browser refuses an over-sized file the moment it is picked, so nobody
+  spends an hour uploading something that was always going to be rejected.
+- Multer aborts the request stream once the limit is passed, and the API returns
+  `413 UPLOAD_REJECTED` naming the actual configured limit. The file is cut off
+  mid-transfer rather than written out in full and then refused.
+- `UploadsService` re-checks the size independently of the interceptor.
+
+Uploads are **spooled to disk, never buffered in memory**, and streamed from
+there into the storage backend. This matters at gigabyte scale: buffering a 2 GB
+upload in RAM pins 2 GB of RSS for the life of the request, and the
+five-per-minute throttle permits enough concurrency to take the process out with
+an OOM. Measured on a 400 MB upload, peak API memory grew by 5 MB. The spool file
+is removed on every exit path, including rejection.
 
 ### Admin safety rails
 

@@ -1,4 +1,4 @@
-import { DOWNLOAD_LIMITS } from '@videohub/config';
+import { DOWNLOAD_LIMITS, UPLOAD_RULES } from '@videohub/config';
 
 /**
  * Typed, validated view of process.env. Nothing in the app reads process.env
@@ -40,6 +40,10 @@ export interface AppConfig {
     tmdbApiKey: string;
     tmdbBaseUrl: string;
     tmdbImageBaseUrl: string;
+  };
+
+  videoCatalogue: {
+    provider: 'archive' | 'none';
   };
 
   storage: {
@@ -123,6 +127,13 @@ export const configuration = (): AppConfig => ({
     tmdbImageBaseUrl: process.env.TMDB_IMAGE_BASE_URL ?? 'https://image.tmdb.org/t/p',
   },
 
+  videoCatalogue: {
+    // Defaults to `none` so a fresh checkout never calls a third party until
+    // someone opts in.
+    provider:
+      (process.env.VIDEO_CATALOGUE_PROVIDER as AppConfig['videoCatalogue']['provider']) ?? 'none',
+  },
+
   storage: {
     provider: (process.env.STORAGE_PROVIDER as AppConfig['storage']['provider']) ?? 'local',
     localDir: process.env.STORAGE_LOCAL_DIR ?? './storage',
@@ -132,7 +143,7 @@ export const configuration = (): AppConfig => ({
     endpoint: process.env.STORAGE_ENDPOINT ?? '',
     accessKey: process.env.STORAGE_ACCESS_KEY ?? '',
     secretKey: process.env.STORAGE_SECRET_KEY ?? '',
-    maxUploadMb: toInt(process.env.MAX_UPLOAD_MB, 200),
+    maxUploadMb: toInt(process.env.MAX_UPLOAD_MB, UPLOAD_RULES.MAX_UPLOAD_MB),
   },
 
   rateLimit: {

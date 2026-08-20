@@ -1,3 +1,4 @@
+import { UPLOAD_RULES } from '@videohub/config';
 import { z } from 'zod';
 
 /**
@@ -45,7 +46,9 @@ const envSchema = z
     STORAGE_ENDPOINT: z.string().optional(),
     STORAGE_ACCESS_KEY: z.string().optional(),
     STORAGE_SECRET_KEY: z.string().optional(),
-    MAX_UPLOAD_MB: z.coerce.number().int().positive().default(200),
+    VIDEO_CATALOGUE_PROVIDER: z.enum(['archive', 'none']).default('none'),
+
+    MAX_UPLOAD_MB: z.coerce.number().int().positive().default(UPLOAD_RULES.MAX_UPLOAD_MB),
 
     RATE_LIMIT_TTL: z.coerce.number().int().positive().default(60),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),

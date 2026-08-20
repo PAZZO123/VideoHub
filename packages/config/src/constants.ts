@@ -54,11 +54,32 @@ export const UPLOAD_RULES = {
     'video/x-matroska',
   ],
   ALLOWED_IMAGE_MIME: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
+  /**
+   * The advertised upload ceiling, in megabytes.
+   *
+   * The API is authoritative and reads MAX_UPLOAD_MB from the environment; this
+   * is the value the web app shows and pre-checks against, so a 2 GB file is
+   * refused in the browser instead of after a long upload. Keep the two in step
+   * — if a deployment lowers MAX_UPLOAD_MB, lower this too.
+   */
+  MAX_UPLOAD_MB: 2048,
   MAX_THUMBNAIL_MB: 5,
   MAX_TAGS: 12,
   MAX_TITLE_LENGTH: 160,
   MAX_DESCRIPTION_LENGTH: 4000,
 } as const;
+
+/**
+ * The upload ceiling as a human would say it — "2 GB", not "2048 MB".
+ *
+ * Shared so the browser hint, the client-side pre-check and the server's
+ * rejection message cannot drift apart into three different numbers.
+ */
+export function formatUploadLimit(megabytes: number = UPLOAD_RULES.MAX_UPLOAD_MB): string {
+  return megabytes >= 1024
+    ? `${Number((megabytes / 1024).toFixed(1))} GB`
+    : `${megabytes} MB`;
+}
 
 export const AI = {
   MAX_MESSAGE_LENGTH: 2000,

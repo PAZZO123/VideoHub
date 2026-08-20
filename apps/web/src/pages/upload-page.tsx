@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { UPLOAD_RULES } from '@videohub/config';
+import { UPLOAD_RULES, formatUploadLimit } from '@videohub/config';
 import type { ModerationStatus } from '@videohub/types';
 import { CheckCircle2, Clock, FileVideo, Trash2, Upload, XCircle } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, Spinner } from '@/components/ui/states';
@@ -11,6 +11,14 @@ import { cn } from '@/lib/cn';
 import { taxonomyService } from '@/services/catalog.service';
 import { uploadsService } from '@/services/admin.service';
 import { usePageTitle } from '@/hooks/use-page-title';
+
+const MAX_UPLOAD_BYTES = UPLOAD_RULES.MAX_UPLOAD_MB * 1024 * 1024;
+const MAX_UPLOAD_LABEL = formatUploadLimit();
+
+function describeSize(bytes: number): string {
+  const mb = bytes / 1024 / 1024;
+  return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
+}
 
 const STATUS_STYLE: Record<ModerationStatus, { label: string; className: string; icon: JSX.Element }> = {
   PENDING: {
@@ -89,6 +97,24 @@ export default function UploadPage(): JSX.Element {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['my-uploads'] }),
   });
 
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>): void => {
+    const chosen = event.target.files?.[0] ?? null;
+    setSuccess(false);
+
+    // Checked here so an over-sized file is refused the moment it is picked,
+    // rather than after minutes of uploading only for the server to cut the
+    // stream off. The API remains the authority — this is a courtesy.
+    if (chosen && chosen.size > MAX_UPLOAD_BYTES) {
+      setError(`That file is ${describeSize(chosen.size)}. The limit is ${MAX_UPLOAD_LABEL}.`);
+      setFile(null);
+      event.target.value = '';
+      return;
+    }
+
+    setError(null);
+    setFile(chosen);
+  };
+
   const handleSubmit = (event: FormEvent): void => {
     event.preventDefault();
     setError(null);
@@ -138,12 +164,12 @@ export default function UploadPage(): JSX.Element {
             id="file"
             type="file"
             accept={UPLOAD_RULES.ALLOWED_VIDEO_MIME.join(',')}
-            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            onChange={handleFileChange}
             className="mt-1.5 w-full rounded-xl border border-white/[0.08] bg-ink-800 px-3.5 py-2.5 text-sm text-ink-100 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-500 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-brand-400"
           />
           <p className="mt-1.5 text-sm text-ink-400">
-            MP4, WebM, OGG, MOV or MKV.
-            {file && ` Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`}
+            MP4, WebM, OGG, MOV or MKV, up to {MAX_UPLOAD_LABEL}.
+            {file && ` Selected: ${file.name} (${describeSize(file.size)})`}
           </p>
         </div>
 

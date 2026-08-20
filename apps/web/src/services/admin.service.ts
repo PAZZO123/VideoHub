@@ -134,8 +134,11 @@ export const uploadsService = {
         onUploadProgress: (event) => {
           if (event.total) onProgress?.(Math.round((event.loaded / event.total) * 100));
         },
-        // Large files legitimately take longer than the default client timeout.
-        timeout: 10 * 60 * 1000,
+        // No client-side deadline. At the 2 GB ceiling, a slow connection can
+        // legitimately spend well over an hour here, and any fixed timeout just
+        // discards an upload that was still making progress. Stalls are caught
+        // by the server and by the user, who can see the progress bar.
+        timeout: 0,
       }),
     );
   },
