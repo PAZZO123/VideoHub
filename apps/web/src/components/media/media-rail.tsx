@@ -69,7 +69,14 @@ export function MediaGrid({
   return (
     <div
       className={cn(
-        'grid justify-items-center gap-x-4 gap-y-7',
+        // `[&>*]:w-full` is load-bearing. The cards carry a fixed pixel width so
+        // they work inside a horizontal rail, where `.rail > *` is `shrink-0`.
+        // Dropped into a grid track narrower than that width, a card overflowed
+        // its column and sat on top of its neighbour — a 300px VideoCard in a
+        // 203px track overlapped the next card by ~97px. Making children fill
+        // the track is what the grid means, and it fixes every listing page at
+        // once rather than each one remembering to pass `w-full`.
+        'grid justify-items-center gap-x-4 gap-y-7 [&>*]:w-full',
         variant === 'poster'
           ? 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7'
           : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',

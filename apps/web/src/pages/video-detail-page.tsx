@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download, ExternalLink, Eye, Play } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { VideoPlayer } from '@/components/video/video-player';
 import { ErrorState, PageLoader } from '@/components/ui/states';
@@ -9,6 +9,11 @@ import { videosService } from '@/services/catalog.service';
 
 export default function VideoDetailPage({ kids = false }: { kids?: boolean }): JSX.Element {
   const { slug = '' } = useParams<{ slug: string }>();
+
+  // The download route sends a browser back here with a reason when it could
+  // not serve the file, rather than leaving it on a page of raw JSON.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const downloadProblem = searchParams.get('download');
 
   const { data: video, isPending, isError, error, refetch } = useQuery({
     queryKey: ['video', slug, { kids }],
@@ -84,6 +89,26 @@ export default function VideoDetailPage({ kids = false }: { kids?: boolean }): J
         </span>
         {video.uploaderName && <span>Uploaded by {video.uploaderName}</span>}
       </div>
+
+      {downloadProblem && (
+        <div
+          role="alert"
+          className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.08] px-4 py-3.5 text-sm text-amber-200/90"
+        >
+          <span>
+            {downloadProblem === 'source-unreachable'
+              ? 'That download could not start — this title streams from its original host, which is not responding right now.'
+              : 'That download is not available.'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchParams({}, { replace: true })}
+            className="font-medium underline underline-offset-2 hover:text-amber-100"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-3">
         {/* Only offered when the rights holder confirmed download rights. */}
