@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Download, ExternalLink, Eye, Play } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { VideoPlayer } from '@/components/video/video-player';
 import { ErrorState, PageLoader } from '@/components/ui/states';
 import { ApiRequestError } from '@/lib/api-client';
 import { videosService } from '@/services/catalog.service';
@@ -46,31 +47,15 @@ export default function VideoDetailPage({ kids = false }: { kids?: boolean }): J
 
       <div className="mt-6 overflow-hidden rounded-2xl bg-black">
         {video.playbackUrl ? (
-          // A captions track is rendered below whenever the uploader supplied
-          // one; the rule cannot see a conditionally rendered <track>.
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <video
-            controls
-            preload="metadata"
+          <VideoPlayer
+            src={video.playbackUrl}
             poster={video.thumbnailUrl ?? undefined}
-            className="aspect-video w-full"
-          >
-            {/* Typed explicitly. Without it the browser has to sniff the
-                container before it will commit to the source, which is slower
-                and, on a cross-origin file behind a redirect, sometimes fails
-                outright. Everything we ingest or accept is MP4. */}
-            <source src={video.playbackUrl} type="video/mp4" />
-            {video.captionsUrl && (
-              <track
-                kind="captions"
-                src={video.captionsUrl}
-                label={video.captionsLabel ?? 'Captions'}
-                srcLang={video.language ?? 'en'}
-                default
-              />
-            )}
-            Your browser does not support the video element.
-          </video>
+            captionsUrl={video.captionsUrl}
+            captionsLabel={video.captionsLabel}
+            language={video.language}
+            sourceUrl={video.source?.url ?? null}
+            sourceName={video.source?.platform ?? null}
+          />
         ) : (
           <div className="grid aspect-video w-full place-items-center bg-ink-850">
             <div className="text-center">
