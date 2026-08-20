@@ -1,7 +1,7 @@
 import type { ApiError, ApiResponse, AuthTokens } from '@videohub/types';
 import axios, { AxiosError, type AxiosInstance, type InternalAxiosRequestConfig } from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
+export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api';
 
 const ACCESS_TOKEN_KEY = 'videohub.accessToken';
 const REFRESH_TOKEN_KEY = 'videohub.refreshToken';

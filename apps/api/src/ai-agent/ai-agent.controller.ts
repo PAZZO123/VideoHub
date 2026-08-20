@@ -43,21 +43,27 @@ export class AiAgentController {
     return this.aiAgent.deleteConversation(userId, id);
   }
 
-  @ApiBearerAuth()
+  // Open to everyone, signed in or not. A guest's thread is created with no
+  // owner and is never listed; their conversation id is the only handle to it.
+  //
   // AI calls cost money per request, so this ceiling is deliberately low and
-  // configurable — a public deployment must not be able to run up a bill.
+  // configurable — a public deployment must not be able to run up a bill. With
+  // no account to key on, the throttler falls back to the caller's IP, which is
+  // exactly what is wanted for anonymous traffic.
+  @OptionalAuth()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('chat')
   @ApiOperation({
     summary: 'Send a message and get the full reply',
-    description: 'Non-streaming. Use /ai/stream for token-by-token output.',
+    description:
+      'Non-streaming. Use /ai/stream for token-by-token output. No account required; signing in keeps the conversation in your history.',
   })
   @ApiResponse({ status: 503, description: 'The AI provider is unavailable.' })
-  chat(@CurrentUser() user: RequestUser, @Body() dto: SendMessageDto) {
-    return this.aiAgent.sendMessage(user.id, dto.message, dto.conversationId, { user });
+  chat(@CurrentUser() user: RequestUser | undefined, @Body() dto: SendMessageDto) {
+    return this.aiAgent.sendMessage(user?.id ?? null, dto.message, dto.conversationId, { user });
   }
 
-  @ApiBearerAuth()
+  @OptionalAuth()
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @RawResponse()
   @Post('stream')
@@ -67,7 +73,7 @@ export class AiAgentController {
       'Emits `conversation`, then `token` per chunk, then `done` with the saved message (or `error`).',
   })
   async stream(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser() user: RequestUser | undefined,
     @Body() dto: SendMessageDto,
     @Req() request: Request,
     @Res() response: Response,
@@ -86,7 +92,7 @@ export class AiAgentController {
 
     try {
       for await (const event of this.aiAgent.streamReply(
-        user.id,
+        user?.id ?? null,
         dto.message,
         dto.conversationId,
         { user },

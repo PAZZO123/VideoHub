@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { AIRole, Prisma } from '@prisma/client';
 import { AI } from '@videohub/config';
 import {
@@ -24,6 +25,9 @@ const CONVERSATION_INCLUDE = {
 
 type ConversationRow = Prisma.AIConversationGetPayload<{ include: typeof CONVERSATION_INCLUDE }>;
 type MessageRow = Prisma.AIMessageGetPayload<Record<string, never>>;
+
+/** How long a signed-out visitor's thread is kept before the sweep removes it. */
+const GUEST_CONVERSATION_TTL_DAYS = 7;
 
 @Injectable()
 export class AiAgentService {
@@ -93,7 +97,7 @@ export class AiAgentService {
    * typed. The assistant message is written once the stream completes.
    */
   async *streamReply(
-    userId: string,
+    userId: string | null,
     message: string,
     conversationId: string | undefined,
     context: VisibilityContext,
@@ -172,7 +176,7 @@ export class AiAgentService {
 
   /** Non-streaming variant, used by tests and clients that cannot take SSE. */
   async sendMessage(
-    userId: string,
+    userId: string | null,
     message: string,
     conversationId: string | undefined,
     context: VisibilityContext,
@@ -224,13 +228,37 @@ export class AiAgentService {
     };
   }
 
+  /**
+   * Removes guest conversations once they are cold.
+   *
+   * A signed-out visitor has no way back to their thread after they close the
+   * tab — the conversation id was the only handle to it — so keeping these
+   * forever would grow the table without ever serving anybody. Threads owned by
+   * an account are untouched.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_4AM, { name: 'purge-guest-conversations' })
+  async purgeGuestConversations(): Promise<number> {
+    const cutoff = new Date(Date.now() - GUEST_CONVERSATION_TTL_DAYS * 24 * 60 * 60 * 1000);
+
+    // Messages go with them via the cascade on AIMessage.
+    const { count } = await this.prisma.aIConversation.deleteMany({
+      where: { isGuest: true, updatedAt: { lt: cutoff } },
+    });
+
+    if (count > 0) this.logger.log(`Purged ${count} cold guest conversation(s).`);
+    return count;
+  }
+
   private async resolveConversation(
-    userId: string,
+    userId: string | null,
     conversationId: string | undefined,
     firstMessage: string,
   ): Promise<{ id: string }> {
     if (conversationId) {
       const existing = await this.prisma.aIConversation.findFirst({
+        // A guest's thread has no owner, so the conversation id is the only
+        // handle to it. Matching on `userId: null` keeps a guest from resuming
+        // a signed-in user's conversation by quoting its id.
         where: { id: conversationId, userId },
         select: { id: true },
       });
@@ -244,7 +272,7 @@ export class AiAgentService {
     }
 
     return this.prisma.aIConversation.create({
-      data: { userId, title: this.titleFrom(firstMessage) },
+      data: { userId, isGuest: userId === null, title: this.titleFrom(firstMessage) },
       select: { id: true },
     });
   }
