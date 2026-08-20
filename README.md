@@ -312,6 +312,26 @@ npm run db:seed:demo --workspace=@videohub/api
 Optional public-domain demo content (8 films, 6 videos) so the homepage rails,
 trending job and Ibitente page render with real data during development.
 
+### Becoming a moderator
+
+Moderation is an **ADMIN** capability — there is no separate moderator role.
+Nothing is an admin by default, and the seeder refuses to invent credentials.
+
+Promote an account you already registered through the UI:
+
+```bash
+npm run db:make:admin --workspace=@videohub/api -- you@example.com
+```
+
+Sign out and back in (the role is baked into your access token), then open
+`/admin` for the dashboard and the moderation queue. `--demote` reverses it, and
+refuses to remove the last admin so moderation can never be locked out.
+
+Alternatively, create one from scratch by setting `SEED_ADMIN_EMAIL` and
+`SEED_ADMIN_PASSWORD` (12 characters minimum) in `.env` and running
+`npm run db:seed`. With either variable missing the seeder skips the admin
+rather than creating a guessable default.
+
 ### Verifying the database
 
 Unit tests run against a mocked Prisma client, so they cannot prove behaviour
@@ -355,6 +375,7 @@ npm run dev
 | `npm run db:seed` | Seed genres, categories and an admin |
 | `npm run db:seed:demo --workspace=@videohub/api` | Optional public-domain demo content |
 | `npm run db:sync:catalogue --workspace=@videohub/api` | Pull real public-domain video from the Internet Archive |
+| `npm run db:make:admin --workspace=@videohub/api -- you@example.com` | Promote an account to ADMIN so it can moderate |
 | `npm run db:verify:all --workspace=@videohub/api` | Live checks against a running API + database |
 
 ## Environment variables
