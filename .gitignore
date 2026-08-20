@@ -45,6 +45,11 @@ Thumbs.db
 vite.config.ts.timestamp-*
 
 # local media scratch (never commit media)
-storage/
-uploads/
+# Anchored with a leading slash on purpose. A bare `storage/` or `uploads/`
+# matches at ANY depth, which silently swallowed apps/api/src/storage and
+# apps/api/src/uploads — the source modules, not the data — so neither was ever
+# committed and a fresh clone could not build.
+/apps/api/storage/
+/storage/
+/uploads/
 tmp/

@@ -6,10 +6,13 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ThrottlerException } from '@nestjs/throttler';
 import { Prisma } from '@prisma/client';
+import { formatUploadLimit } from '@videohub/config';
 import { ErrorCode, type ApiError } from '@videohub/types';
 import type { Request, Response } from 'express';
+import type { AppConfig } from '../../config/configuration';
 import { AppException } from '../exceptions/app.exception';
 
 /**
@@ -20,6 +23,10 @@ import { AppException } from '../exceptions/app.exception';
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
+
+  // Injected rather than read from the shared constant so the message quotes
+  // the ceiling this deployment actually enforces, not the packaged default.
+  constructor(private readonly config: ConfigService<AppConfig, true>) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -105,6 +112,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
           },
         };
       }
+    }
+
+    // By the time an oversized upload reaches here, Nest's file interceptor has
+    // already turned multer's LIMIT_FILE_SIZE into a PayloadTooLargeException,
+    // so this — not a MulterError branch — is where it lands. Its own message is
+    // a bare "File too large", which never tells the user what the limit is.
+    if (status === HttpStatus.PAYLOAD_TOO_LARGE) {
+      return {
+        status,
+        body: {
+          success: false,
+          message: `That file is larger than the ${formatUploadLimit(
+            this.config.get('storage', { infer: true }).maxUploadMb,
+          )} limit.`,
+          code: ErrorCode.UPLOAD_REJECTED,
+        },
+      };
     }
 
     const codeByStatus: Record<number, ErrorCode> = {

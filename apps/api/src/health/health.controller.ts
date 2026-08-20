@@ -15,6 +15,7 @@ interface HealthReport {
   config: {
     aiProvider: string;
     metadataProvider: string;
+    videoCatalogueProvider: string;
     storageProvider: string;
   };
 }
@@ -42,6 +43,7 @@ export class HealthController {
       config: {
         aiProvider: this.config.get('ai', { infer: true }).provider,
         metadataProvider: this.config.get('metadata', { infer: true }).provider,
+        videoCatalogueProvider: this.config.get('videoCatalogue', { infer: true }).provider,
         storageProvider: this.config.get('storage', { infer: true }).provider,
       },
     };

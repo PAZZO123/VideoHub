@@ -55,7 +55,11 @@ export default function VideoDetailPage({ kids = false }: { kids?: boolean }): J
             poster={video.thumbnailUrl ?? undefined}
             className="aspect-video w-full"
           >
-            <source src={video.playbackUrl} />
+            {/* Typed explicitly. Without it the browser has to sniff the
+                container before it will commit to the source, which is slower
+                and, on a cross-origin file behind a redirect, sometimes fails
+                outright. Everything we ingest or accept is MP4. */}
+            <source src={video.playbackUrl} type="video/mp4" />
             {video.captionsUrl && (
               <track
                 kind="captions"

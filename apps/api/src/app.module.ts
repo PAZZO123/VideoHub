@@ -17,6 +17,7 @@ import { SearchModule } from './search/search.controller';
 import { TrendingModule } from './trending/trending.controller';
 import { StorageModule } from './storage/storage.module';
 import { UploadsModule } from './uploads/uploads.controller';
+import { VideoCatalogueModule } from './video-catalogue/video-catalogue.module';
 import { VideosModule } from './videos/videos.module';
 import { WatchlistModule } from './watchlist/watchlist.controller';
 import { AgeVerificationGuard } from './common/guards/age-verification.guard';
@@ -52,6 +53,7 @@ import { UsersModule } from './users/users.module';
     PrismaModule,
     StorageModule,
     MovieMetadataModule,
+    VideoCatalogueModule,
     AuthModule,
     UsersModule,
     MoviesModule,

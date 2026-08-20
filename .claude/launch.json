@@ -2,9 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "videohub",
+      "name": "videohub-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev:api"],
+      "port": 3000,
+      "url": "http://localhost:3000"
+    },
+    {
+      "name": "videohub-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev:web"],
       "port": 5173
     }
   ]
