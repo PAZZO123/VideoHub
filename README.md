@@ -402,6 +402,22 @@ AI endpoints carry their own tighter rate limit (`AI_RATE_LIMIT_MAX`) so a publi
 deployment cannot run up an unbounded bill, and streaming is aborted the moment
 the client disconnects so an abandoned tab stops costing tokens.
 
+### Who can use it
+
+VideoHub AI is **open to everyone — no account needed**. A signed-out visitor
+gets a real conversation thread; it simply has no owner, is never listed, and
+its conversation id is the only handle to it. Signing in keeps the history.
+
+Threads stay isolated in both directions: a guest cannot resume a signed-in
+user's conversation by quoting its id, and a signed-in user cannot resume a
+guest's. `/ai/conversations` (list, read, delete) remains account-only. Guest
+threads are swept after 7 days, since nobody can ever return to them.
+
+**Watch the cost.** With `AI_PROVIDER=mock` this is free. Point it at a real
+provider and anonymous traffic can spend money, so `AI_RATE_LIMIT_MAX`
+(default 10/minute) is the ceiling that matters — with no account to key on, the
+throttler falls back to the caller's IP.
+
 ### How the assistant is kept honest
 
 The model is given the catalogue as context and instructed to recommend **only**
@@ -587,6 +603,27 @@ unreviewed.
 
 `downloadAllowed` on an upload is only honoured when the rights claim is also
 present — the service recomputes it rather than trusting the submitted flag.
+
+### Downloading a video
+
+The Download button on a video page hits `GET /api/videos/:slug/download`.
+
+It is served through the API rather than linking straight at the media, for two
+reasons: a cross-origin `<a download>` is ignored by browsers (the file opens in
+a tab instead of saving), and routing through the API keeps the rights check
+somewhere it cannot be skipped. `downloadAllowed` **and** `rightsConfirmed` must
+both hold — exactly what the UI computes before offering the button.
+
+- **Mirrored or uploaded** — redirects to the files route, which does ranges and
+  resume properly.
+- **Not mirrored** — streams from the allowlisted source, retried a few times
+  because archive.org's nodes intermittently refuse a connection. If the source
+  is unreachable the answer is `503 DOWNLOAD_SOURCE_UNAVAILABLE`, not a rights
+  error — the licence permits it, the host is simply down. Mirroring the title
+  removes that dependency.
+
+Refusals are `404`, not `403`, for anything the viewer could not see anyway, so
+this route cannot be used to probe which titles exist.
 
 ### Upload size
 

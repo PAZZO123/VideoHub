@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ModerationStatus, Prisma } from '@prisma/client';
 import {
   ErrorCode,
@@ -11,6 +11,7 @@ import { canView, isKidsView, visibilityWhere, type VisibilityContext } from '..
 import { paginate } from '../common/dto/pagination.dto';
 import { AppException } from '../common/exceptions/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
+import { STORAGE_SERVICE, type StorageService } from '../storage/storage.interface';
 import type { QueryVideosDto } from './dto/query-videos.dto';
 import {
   VIDEO_DETAIL_INCLUDE,
@@ -21,7 +22,21 @@ import {
 
 @Injectable()
 export class VideosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(STORAGE_SERVICE) private readonly storage: StorageService,
+  ) {}
+
+  /**
+   * A URL that saves rather than plays.
+   *
+   * The storage service decides what that means: the local backend appends a
+   * filename the files route turns into Content-Disposition, while a bucket
+   * returns a signed URL carrying the same header.
+   */
+  downloadUrlFor(storageKey: string, filename: string): Promise<string> {
+    return this.storage.getUrl(storageKey, { downloadFilename: filename });
+  }
 
   async findAll(
     query: QueryVideosDto,
@@ -60,6 +75,53 @@ export class VideosService {
     }
 
     return toVideoDetail(video);
+  }
+
+  /**
+   * Resolves a video for download, enforcing the same rules the detail page does
+   * plus the rights check.
+   *
+   * `downloadAllowed` alone is not enough: `rightsConfirmed` must agree, exactly
+   * as `toVideoDetail` computes it for the UI. A viewer must never be able to
+   * reach bytes through this route that the page would not offer them.
+   */
+  async findForDownload(
+    slug: string,
+    context: VisibilityContext,
+  ): Promise<{
+    title: string;
+    storageKey: string | null;
+    playbackUrl: string | null;
+    sourceUrl: string | null;
+  }> {
+    const video = await this.prisma.video.findFirst({
+      where: { slug, moderationStatus: ModerationStatus.APPROVED },
+      include: VIDEO_DETAIL_INCLUDE,
+    });
+
+    // 404 rather than 403 throughout, so this route cannot be used to probe
+    // which titles exist.
+    if (!video || !canView(video.maturityRating, context)) {
+      throw AppException.notFound(ErrorCode.VIDEO_NOT_FOUND, 'We couldn’t find that video.');
+    }
+
+    if (isKidsView(context) && !video.category?.isKids) {
+      throw AppException.notFound(ErrorCode.VIDEO_NOT_FOUND, 'We couldn’t find that video.');
+    }
+
+    if (!(video.downloadAllowed && video.rightsConfirmed)) {
+      throw AppException.forbidden(
+        ErrorCode.DOWNLOAD_NOT_PERMITTED,
+        'The rights holder has not permitted downloads of this video.',
+      );
+    }
+
+    return {
+      title: video.title,
+      storageKey: video.storageKey,
+      playbackUrl: video.playbackUrl,
+      sourceUrl: video.sources?.[0]?.url ?? null,
+    };
   }
 
   async recordView(videoId: string): Promise<void> {

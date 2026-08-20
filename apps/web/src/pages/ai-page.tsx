@@ -183,7 +183,7 @@ export default function AiPage(): JSX.Element {
   // A suggested prompt can arrive as ?q= from the homepage CTA.
   useEffect(() => {
     const seeded = searchParams.get('q');
-    if (seeded && isAuthenticated && messages.length === 0 && !isStreaming) {
+    if (seeded && messages.length === 0 && !isStreaming) {
       setSearchParams({}, { replace: true });
       send(seeded);
     }
@@ -209,31 +209,6 @@ export default function AiPage(): JSX.Element {
     setError(null);
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="mx-auto max-w-2xl px-4 pb-20 pt-32 text-center sm:px-6">
-        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-brand-sheen">
-          <Sparkles className="size-7 text-white" aria-hidden="true" />
-        </span>
-        <h1 className="mt-6 font-display text-display-md font-bold text-white">VideoHub AI</h1>
-        <p className="mt-4 text-ink-400">
-          Sign in to chat with VideoHub AI. It recommends from the VideoHub catalogue and always
-          explains why.
-        </p>
-        <div className="mt-8 flex justify-center gap-3">
-          <Link to="/login" state={{ from: '/ai' }}>
-            <Button size="lg">Sign in</Button>
-          </Link>
-          <Link to="/register">
-            <Button size="lg" variant="outline">
-              Create an account
-            </Button>
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto flex max-w-[1400px] gap-6 px-4 pb-24 pt-24 sm:px-6 lg:px-10">
       {/* Conversation list */}
@@ -246,6 +221,19 @@ export default function AiPage(): JSX.Element {
         >
           New conversation
         </Button>
+
+        {/* A guest's thread is real but unowned, so it cannot be listed or
+            resumed after the tab closes. Say so rather than showing an
+            empty panel that looks broken. */}
+        {!isAuthenticated && (
+          <p className="mt-4 rounded-xl border border-white/[0.08] bg-ink-850 px-3.5 py-3 text-xs leading-relaxed text-ink-400">
+            You're chatting as a guest.{' '}
+            <Link to="/login" state={{ from: '/ai' }} className="font-medium text-brand-300 hover:text-brand-200">
+              Sign in
+            </Link>{' '}
+            to keep your conversations.
+          </p>
+        )}
 
         {conversations && conversations.length > 0 && (
           <nav aria-label="Conversations" className="mt-4">

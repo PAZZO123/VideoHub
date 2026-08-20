@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { VideoPlayer } from '@/components/video/video-player';
 import { ErrorState, PageLoader } from '@/components/ui/states';
-import { ApiRequestError } from '@/lib/api-client';
+import { API_URL, ApiRequestError } from '@/lib/api-client';
 import { videosService } from '@/services/catalog.service';
 
 export default function VideoDetailPage({ kids = false }: { kids?: boolean }): JSX.Element {
@@ -88,7 +88,13 @@ export default function VideoDetailPage({ kids = false }: { kids?: boolean }): J
       <div className="mt-6 flex flex-wrap gap-3">
         {/* Only offered when the rights holder confirmed download rights. */}
         {video.downloadAllowed ? (
-          <Button leftIcon={<Download className="size-4" />}>Download</Button>
+          // A plain link, not a fetch-to-blob: the browser streams the file
+          // straight to disk with its own progress UI, where reading a
+          // feature-length video into memory first would not. The API sets
+          // Content-Disposition, so this saves rather than navigates.
+          <a href={`${API_URL}/videos/${video.slug}/download`} download>
+            <Button leftIcon={<Download className="size-4" />}>Download</Button>
+          </a>
         ) : video.source ? (
           <a href={video.source.url} target="_blank" rel="noopener noreferrer">
             <Button variant="outline" rightIcon={<ExternalLink className="size-4" />}>
