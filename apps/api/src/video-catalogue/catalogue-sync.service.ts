@@ -7,8 +7,8 @@ import {
   type DiscoveryQuery,
   type FeaturedVideo,
 } from '@videohub/config';
-import { Readable } from 'node:stream';
 import slugify from 'slugify';
+import { getSlowSource } from '../common/slow-source';
 import { PrismaService } from '../prisma/prisma.service';
 import { STORAGE_SERVICE, type StorageService } from '../storage/storage.interface';
 import {
@@ -296,30 +296,34 @@ export class CatalogueSyncService {
         })…`,
       );
 
-      const res = await fetch(external.playbackUrl, {
-        headers: { 'User-Agent': 'VideoHub/0.1 (catalogue mirror)' },
-        // Generous: these transfers are large and the source is slow. The cap
-        // is on the whole body, not on time-to-first-byte.
-        signal: AbortSignal.timeout(30 * 60_000),
+      // Not global fetch: its ~10s connect limit is unreachable through the
+      // options and archive.org's nodes regularly need longer than that just to
+      // answer. Every "fetch failed" here used to be a slow node, not a dead
+      // file — the same URL succeeded from curl in 29.6s.
+      const res = await getSlowSource(external.playbackUrl, {
+        userAgent: 'VideoHub/0.1 (catalogue mirror)',
+        timeoutMs: 5 * 60_000,
       });
 
-      if (!res.ok || !res.body) {
+      if (!res.ok) {
+        res.stream.resume();
         this.logger.warn(`  mirror failed: HTTP ${res.status} for ${external.playbackUrl}`);
         report.mirrorFailed += 1;
         return null;
       }
 
-      const declared = Number(res.headers.get('content-length'));
-      if (Number.isFinite(declared) && declared > maxBytes) {
+      const declared = res.contentLength;
+      if (declared !== null && declared > maxBytes) {
+        res.stream.resume();
         this.logger.log(`  skipping mirror — server reports ${Math.round(declared / 1048576)} MB`);
         return null;
       }
 
       const stored = await this.storage.upload({
         key,
-        body: Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]),
+        body: res.stream,
         contentType: 'video/mp4',
-        ...(Number.isFinite(declared) && declared > 0 ? { contentLength: declared } : {}),
+        ...(declared !== null ? { contentLength: declared } : {}),
         publicRead: true,
       });
 

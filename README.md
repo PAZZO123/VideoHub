@@ -496,6 +496,13 @@ npm run db:sync:catalogue --workspace=@videohub/api -- --curated-only --mirror
 npm run db:sync:catalogue --workspace=@videohub/api -- --mirror --mirror-max-mb=500
 ```
 
+Mirroring and the download proxy both read through `getSlowSource`
+(`src/common/slow-source.ts`) rather than global `fetch`. Node's `fetch` gives up
+on a connection after about ten seconds and that limit cannot be raised through
+its options — undici is not a dependency here. archive.org's storage nodes
+routinely need longer: one answered a 1 KB range request in 29.6s. Every
+"fetch failed" in the mirror logs was a slow node, not a dead file.
+
 `--mirror` copies each file once into `StorageService` and repoints
 `playbackUrl` at your own backend, so viewers never wait on a third party. It is
 streamed, never buffered, and skips anything over `--mirror-max-mb` (default

@@ -1,11 +1,13 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { ALLOWED_HOSTS } from '@videohub/config';
 import { ErrorCode, type Paginated, type VideoDetail, type VideoSummary } from '@videohub/types';
-import type { Response } from 'express';
-import { Readable } from 'node:stream';
+import type { Request, Response } from 'express';
 import { CurrentUser, OptionalAuth, RawResponse, type RequestUser } from '../common/decorators';
+import type { AppConfig } from '../config/configuration';
 import { AppException } from '../common/exceptions/app.exception';
+import { getSlowSource } from '../common/slow-source';
 import { QueryVideosDto } from './dto/query-videos.dto';
 import { VideosService } from './videos.service';
 
@@ -29,7 +31,16 @@ function downloadFilename(title: string): string {
 @ApiTags('videos')
 @Controller('videos')
 export class VideosController {
-  constructor(private readonly videosService: VideosService) {}
+  constructor(
+    private readonly videosService: VideosService,
+    private readonly config: ConfigService<AppConfig, true>,
+  ) {}
+
+  /** Back to the video page, carrying why the download did not happen. */
+  private videoPageUrl(slug: string, reason: string): string {
+    const [origin] = this.config.get('webOrigin', { infer: true });
+    return `${origin ?? ''}/videos/${encodeURIComponent(slug)}?download=${reason}`;
+  }
 
   @OptionalAuth()
   @Get()
@@ -63,10 +74,24 @@ export class VideosController {
   @ApiParam({ name: 'slug' })
   async download(
     @Param('slug') slug: string,
+    @Req() request: Request,
     @Res() response: Response,
     @CurrentUser() user?: RequestUser,
   ): Promise<void> {
-    const video = await this.videosService.findForDownload(slug, { user });
+    // A browser following this link must never be dumped on a page of raw JSON.
+    // When the caller is a navigation rather than an API client, failures go
+    // back to the video page with a flag it can explain properly.
+    const isNavigation = (request.headers.accept ?? '').includes('text/html');
+
+    let video: Awaited<ReturnType<VideosService['findForDownload']>>;
+    try {
+      video = await this.videosService.findForDownload(slug, { user });
+    } catch (error: unknown) {
+      if (!isNavigation) throw error;
+      response.redirect(302, this.videoPageUrl(slug, 'not-available'));
+      return;
+    }
+
     const filename = downloadFilename(video.title);
 
     // Mirrored or uploaded: the bytes are ours, so hand off to the files route,
@@ -87,19 +112,22 @@ export class VideosController {
     // Not mirrored yet, so proxy the allowlisted source. Streamed straight
     // through — a feature film must never be buffered into memory here.
     //
-    // Retried because archive.org's storage nodes intermittently fail to accept
-    // a connection inside Node's 10s default, and that limit is not reachable
-    // through the fetch options. A second or third attempt usually lands on a
-    // node that answers.
-    let upstream: Awaited<ReturnType<typeof fetch>> | null = null;
-    for (let attempt = 1; attempt <= 3 && !upstream?.ok; attempt += 1) {
-      upstream = await fetch(video.playbackUrl, {
-        headers: { 'User-Agent': 'VideoHub/0.1 (download proxy)' },
-        redirect: 'follow',
-      }).catch(() => null);
-    }
+    // getSlowSource rather than fetch: archive.org's nodes often need far
+    // longer than fetch's ~10s connect limit, which cannot be raised through
+    // its options. The same URL that "fetch failed" answered curl in 29.6s.
+    const upstream = await getSlowSource(video.playbackUrl, {
+      userAgent: 'VideoHub/0.1 (download proxy)',
+      timeoutMs: 3 * 60_000,
+    }).catch(() => null);
 
-    if (!upstream?.ok || !upstream.body) {
+    if (!upstream?.ok) {
+      upstream?.stream.resume();
+
+      if (isNavigation) {
+        response.redirect(302, this.videoPageUrl(slug, 'source-unreachable'));
+        return;
+      }
+
       // Not a rights problem — the licence permits this, the host is simply
       // unreachable. Saying "not permitted" would send the user looking for the
       // wrong fix.
@@ -111,10 +139,14 @@ export class VideosController {
 
     response.setHeader('Content-Type', 'video/mp4');
     response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    const length = upstream.headers.get('content-length');
-    if (length) response.setHeader('Content-Length', length);
+    if (upstream.contentLength !== null) {
+      response.setHeader('Content-Length', String(upstream.contentLength));
+    }
 
-    Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]).pipe(response);
+    // If the client goes away mid-download, stop pulling from the origin rather
+    // than finishing a transfer nobody is receiving.
+    response.on('close', () => upstream.stream.destroy());
+    upstream.stream.pipe(response);
   }
 
   @OptionalAuth()

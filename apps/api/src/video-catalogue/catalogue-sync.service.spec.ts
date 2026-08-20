@@ -1,5 +1,13 @@
 import { Test, type TestingModule } from '@nestjs/testing';
 import { ModerationStatus } from '@prisma/client';
+import { Readable } from 'node:stream';
+import { getSlowSource } from '../common/slow-source';
+
+// The mirror reads through getSlowSource, not global fetch: archive.org's nodes
+// routinely exceed fetch's unreachable ~10s connect limit. No test touches the
+// network.
+jest.mock('../common/slow-source', () => ({ getSlowSource: jest.fn() }));
+const getSlowSourceMock = getSlowSource as jest.MockedFunction<typeof getSlowSource>;
 import { PrismaService } from '../prisma/prisma.service';
 import { CatalogueSyncService } from './catalogue-sync.service';
 import { STORAGE_SERVICE } from '../storage/storage.interface';
@@ -77,20 +85,15 @@ describe('CatalogueSyncService', () => {
       delete: jest.fn(),
     };
 
-    // No test reaches the network; mirroring is exercised through this stub.
-    // A real ReadableStream, not a hand-rolled object: the service hands the
-    // body to Readable.fromWeb, which rejects anything else.
-    global.fetch = jest.fn().mockImplementation(async () => ({
+    getSlowSourceMock.mockReset();
+    getSlowSourceMock.mockImplementation(async (url: string) => ({
       ok: true,
       status: 200,
-      body: new ReadableStream({
-        start(controller) {
-          controller.enqueue(new Uint8Array([0, 0, 0, 0]));
-          controller.close();
-        },
-      }),
-      headers: new Map([['content-length', '40000000']]),
-    })) as unknown as typeof fetch;
+      contentLength: 40_000_000,
+      contentType: 'video/mp4',
+      stream: Readable.from([Buffer.from([0, 0, 0, 0])]) as never,
+      finalUrl: url,
+    }));
 
     moduleRef = await Test.createTestingModule({
       providers: [
@@ -216,7 +219,7 @@ describe('CatalogueSyncService', () => {
     it('falls back to the provider URL when the mirror fails', async () => {
       // A failed mirror must degrade to slower playback, never to a row with
       // no source at all.
-      global.fetch = jest.fn().mockRejectedValue(new Error('ECONNRESET')) as unknown as typeof fetch;
+      getSlowSourceMock.mockRejectedValue(new Error('ECONNRESET'));
 
       const report = await service.sync({ includeDiscovery: false, mirror: true, mirrorMaxMb: 500 });
 
