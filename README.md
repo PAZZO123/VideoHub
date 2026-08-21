@@ -478,6 +478,22 @@ STORAGE_SECRET_KEY=...
 
 `tmdb` enables metadata sync where permitted. Set `TMDB_API_KEY`. External calls are made only on explicit sync, never per page view.
 
+## Search
+
+Every listing page has its own search box, not just the global `/search` page:
+**Movies**, **Videos**, **Ibitente** and **Trending**.
+
+All four share `SearchField`. Typing is driven by local state so it stays
+responsive, and the debounced value is what reaches the page — a listing turns
+each change into a request, and one per keystroke would hammer the API and make
+results flicker. Movies, Videos and Trending keep the term in the URL as `?q=`,
+so a search is shareable and survives back-navigation; Ibitente keeps it in
+local state, since a child is not bookmarking it.
+
+Searching trending filters by title and then keeps the trending order, so the
+results read as "what is popular that matches" rather than a second,
+differently-ranked search page.
+
 ## Real video catalogue
 
 `VIDEO_CATALOGUE_PROVIDER` controls where playable video comes from.

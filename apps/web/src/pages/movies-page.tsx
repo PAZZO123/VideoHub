@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Film } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { FilterBar, type CatalogFilters } from '@/components/media/filter-bar';
+import { SearchField } from '@/components/media/search-field';
 import { MovieCard } from '@/components/media/media-card';
 import { MediaGrid } from '@/components/media/media-rail';
 import { Pagination } from '@/components/media/pagination';
@@ -17,6 +18,7 @@ export default function MoviesPage(): JSX.Element {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const page = Number(searchParams.get('page') ?? '1');
+  const q = searchParams.get('q') ?? '';
   const filters: CatalogFilters = {
     genre: searchParams.get('genre') ?? undefined,
     year: searchParams.get('year') ? Number(searchParams.get('year')) : undefined,
@@ -32,8 +34,8 @@ export default function MoviesPage(): JSX.Element {
   });
 
   const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['movies', { page, ...filters }],
-    queryFn: () => moviesService.list({ page, ...filters }),
+    queryKey: ['movies', { page, q, ...filters }],
+    queryFn: () => moviesService.list({ page, q: q || undefined, ...filters }),
     // Keeps the previous page visible while the next one loads, instead of
     // collapsing the grid to skeletons on every page change.
     placeholderData: (previous) => previous,
@@ -69,11 +71,25 @@ export default function MoviesPage(): JSX.Element {
       <header>
         <h1 className="font-display text-display-md font-bold text-white">Movies</h1>
         <p className="mt-2 text-ink-400">
-          {data ? `${data.meta.total.toLocaleString()} titles` : 'Browse the full catalogue'}
+          {data
+            ? `${data.meta.total.toLocaleString()} ${data.meta.total === 1 ? 'title' : 'titles'}`
+            : 'Browse the full catalogue'}
         </p>
       </header>
 
       <div className="mt-7">
+        <SearchField
+          value={q}
+          // Searching from page 4 must not leave you on page 4 of a shorter
+          // list of results.
+          onChange={(next) => updateParams({ q: next, page: undefined })}
+          label="Search movies"
+          placeholder="Search by title, director or cast…"
+          className="max-w-xl"
+        />
+      </div>
+
+      <div className="mt-5">
         <FilterBar filters={filters} genres={genres} onChange={handleFilterChange} />
       </div>
 
@@ -93,8 +109,12 @@ export default function MoviesPage(): JSX.Element {
         ) : data.items.length === 0 ? (
           <EmptyState
             icon={<Film className="size-9" />}
-            title="No movies match those filters"
-            description="Try widening your filters, or clear them to see everything."
+            title={q ? `No movies match “${q}”` : 'No movies match those filters'}
+            description={
+              q
+                ? 'Try a different title, or clear the search to browse everything.'
+                : 'Try widening your filters, or clear them to see everything.'
+            }
           />
         ) : (
           <>

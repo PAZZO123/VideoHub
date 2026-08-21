@@ -93,7 +93,7 @@ export const taxonomyService = {
 };
 
 export const trendingService = {
-  list(limit = 20): Promise<TrendingItemDto[]> {
-    return unwrap(api.get('/trending', { params: { limit } }));
+  list(limit = 20, q?: string): Promise<TrendingItemDto[]> {
+    return unwrap(api.get('/trending', { params: { limit, ...(q ? { q } : {}) } }));
   },
 };

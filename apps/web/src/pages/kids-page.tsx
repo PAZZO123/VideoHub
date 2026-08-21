@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { taxonomyService, videosService } from '@/services/catalog.service';
 import { cn } from '@/lib/cn';
+import { SearchField } from '@/components/media/search-field';
 import { usePageTitle } from '@/hooks/use-page-title';
 
 /**
@@ -74,6 +75,7 @@ function KidVideoCard({ video, index }: { video: VideoSummary; index: number }):
 export default function KidsPage(): JSX.Element {
   usePageTitle('Ibitente');
   const [activeCategory, setActiveCategory] = useState<string | undefined>(undefined);
+  const [search, setSearch] = useState('');
 
   const { data: categories } = useQuery({
     queryKey: ['categories', 'kids'],
@@ -82,8 +84,9 @@ export default function KidsPage(): JSX.Element {
   });
 
   const { data, isPending } = useQuery({
-    queryKey: ['kids-videos', activeCategory],
-    queryFn: () => videosService.listKids({ category: activeCategory, limit: 24 }),
+    queryKey: ['kids-videos', activeCategory, search],
+    queryFn: () =>
+      videosService.listKids({ category: activeCategory, q: search || undefined, limit: 24 }),
     placeholderData: (previous) => previous,
   });
 
@@ -120,8 +123,20 @@ export default function KidsPage(): JSX.Element {
           </p>
         </header>
 
+        {/* Big, round and high-contrast, to match everything else on this page —
+            a child hunting for one song should not have to scroll. */}
+        <div className="mx-auto mt-8 max-w-md">
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            label="Search Ibitente videos"
+            placeholder="Find a song or cartoon…"
+            playful
+          />
+        </div>
+
         {categories && categories.length > 0 && (
-          <nav aria-label="Kids categories" className="mt-10">
+          <nav aria-label="Kids categories" className="mt-8">
             <ul className="flex flex-wrap justify-center gap-3">
               <li>
                 <button
@@ -178,10 +193,12 @@ export default function KidsPage(): JSX.Element {
                 🎪
               </p>
               <h2 className="mt-4 font-kid text-3xl font-extrabold text-white">
-                Nothing here yet!
+                {search ? 'Nothing found!' : 'Nothing here yet!'}
               </h2>
               <p className="mt-2 font-kid text-lg font-bold text-white/80">
-                New cartoons and songs are coming soon. Check back!
+                {search
+                  ? `We couldn't find “${search}”. Try another word!`
+                  : 'New cartoons and songs are coming soon. Check back!'}
               </p>
             </div>
           ) : (

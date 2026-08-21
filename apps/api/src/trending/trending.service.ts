@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { ModerationStatus } from '@prisma/client';
+import { ModerationStatus, Prisma } from '@prisma/client';
 import {
   TRENDING_ACTIVITY_WINDOW_DAYS,
   TRENDING_RECENCY_HALF_LIFE_DAYS,
@@ -20,18 +20,44 @@ export class TrendingService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getTrending(context: VisibilityContext, limit = 20): Promise<TrendingItemDto[]> {
+  async getTrending(
+    context: VisibilityContext,
+    limit = 20,
+    search?: string,
+  ): Promise<TrendingItemDto[]> {
     const visibility = visibilityWhere(context);
+    const q = search?.trim();
+
+    // Searching trending is still searching: filter by title, then keep the
+    // trending order so results read as "what is popular that matches", not a
+    // second, differently-ranked search page.
+    const movieMatch = q
+      ? {
+          OR: [
+            { title: { contains: q, mode: Prisma.QueryMode.insensitive } },
+            { originalTitle: { contains: q, mode: Prisma.QueryMode.insensitive } },
+          ],
+        }
+      : {};
+
+    const videoMatch = q
+      ? {
+          OR: [
+            { title: { contains: q, mode: Prisma.QueryMode.insensitive } },
+            { description: { contains: q, mode: Prisma.QueryMode.insensitive } },
+          ],
+        }
+      : {};
 
     const [movies, videos] = await Promise.all([
       this.prisma.movie.findMany({
-        where: { ...visibility, isPublished: true },
+        where: { ...visibility, isPublished: true, ...movieMatch },
         include: MOVIE_SUMMARY_INCLUDE,
         orderBy: [{ trendingScore: 'desc' }, { id: 'asc' }],
         take: limit,
       }),
       this.prisma.video.findMany({
-        where: { ...visibility, moderationStatus: ModerationStatus.APPROVED },
+        where: { ...visibility, moderationStatus: ModerationStatus.APPROVED, ...videoMatch },
         include: VIDEO_SUMMARY_INCLUDE,
         orderBy: [{ trendingScore: 'desc' }, { id: 'asc' }],
         take: limit,

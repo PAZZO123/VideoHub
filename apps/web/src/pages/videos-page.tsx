@@ -3,6 +3,7 @@ import { Video } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { VideoCard } from '@/components/media/media-card';
 import { MediaGrid } from '@/components/media/media-rail';
+import { SearchField } from '@/components/media/search-field';
 import { Pagination } from '@/components/media/pagination';
 import { EmptyState, ErrorState } from '@/components/ui/states';
 import { cn } from '@/lib/cn';
@@ -15,6 +16,7 @@ export default function VideosPage(): JSX.Element {
 
   const page = Number(searchParams.get('page') ?? '1');
   const category = searchParams.get('category') ?? undefined;
+  const q = searchParams.get('q') ?? '';
 
   const { data: categories } = useQuery({
     queryKey: ['categories', 'non-kids'],
@@ -23,8 +25,8 @@ export default function VideosPage(): JSX.Element {
   });
 
   const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['videos', { page, category }],
-    queryFn: () => videosService.list({ page, category }),
+    queryKey: ['videos', { page, category, q }],
+    queryFn: () => videosService.list({ page, category, q: q || undefined }),
     placeholderData: (previous) => previous,
   });
 
@@ -42,12 +44,26 @@ export default function VideosPage(): JSX.Element {
       <header>
         <h1 className="font-display text-display-md font-bold text-white">Videos</h1>
         <p className="mt-2 text-ink-400">
-          {data ? `${data.meta.total.toLocaleString()} videos` : 'Browse everything on VideoHub'}
+          {data
+            ? `${data.meta.total.toLocaleString()} ${data.meta.total === 1 ? 'video' : 'videos'}`
+            : 'Browse everything on VideoHub'}
         </p>
       </header>
 
+      <div className="mt-7">
+        <SearchField
+          value={q}
+          // Searching from page 3 must not strand you past the end of a
+          // shorter result set.
+          onChange={(next) => setParam('q', next || undefined)}
+          label="Search videos"
+          placeholder="Search by title, description or tag…"
+          className="max-w-xl"
+        />
+      </div>
+
       {categories && categories.length > 0 && (
-        <nav aria-label="Categories" className="mt-7">
+        <nav aria-label="Categories" className="mt-5">
           <ul className="flex flex-wrap gap-2">
             <li>
               <button
@@ -107,11 +123,13 @@ export default function VideosPage(): JSX.Element {
         ) : data.items.length === 0 ? (
           <EmptyState
             icon={<Video className="size-9" />}
-            title="No videos here yet"
+            title={q ? `No videos match “${q}”` : 'No videos here yet'}
             description={
-              category
-                ? 'Nothing in this category yet. Try another one.'
-                : 'Approved uploads will appear here.'
+              q
+                ? 'Try a different word, or clear the search to browse everything.'
+                : category
+                  ? 'Nothing in this category yet. Try another one.'
+                  : 'Approved uploads will appear here.'
             }
           />
         ) : (
