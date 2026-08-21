@@ -2,7 +2,7 @@ import { Controller, Get, Module, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { UserRole, type TrendingItemDto } from '@videohub/types';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { CurrentUser, OptionalAuth, Roles, type RequestUser } from '../common/decorators';
 import { TrendingService } from './trending.service';
 
@@ -13,6 +13,11 @@ class TrendingQueryDto {
   @Min(1)
   @Max(50)
   limit?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  q?: string;
 }
 
 @ApiTags('trending')
@@ -27,11 +32,12 @@ export class TrendingController {
     description: 'Ranked by a score recalculated hourly by a scheduled job.',
   })
   @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'q', required: false, description: 'Narrow trending by title.' })
   findAll(
     @Query() query: TrendingQueryDto,
     @CurrentUser() user?: RequestUser,
   ): Promise<TrendingItemDto[]> {
-    return this.trendingService.getTrending({ user }, query.limit ?? 20);
+    return this.trendingService.getTrending({ user }, query.limit ?? 20, query.q);
   }
 
   @ApiBearerAuth()
