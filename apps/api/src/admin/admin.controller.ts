@@ -7,9 +7,9 @@ import {
   type CategoryDto,
   type GenreDto,
   type MovieDetail,
+  type ModerationItem,
   type Paginated,
   type SourceDto,
-  type VideoSummary,
 } from '@videohub/types';
 import { CurrentUser, Roles } from '../common/decorators';
 import { AdminService } from './admin.service';
@@ -86,7 +86,7 @@ export class AdminController {
     summary: 'Uploads awaiting review',
     description: 'Oldest first — a review queue should be fair rather than newest-first.',
   })
-  moderationQueue(@Query() query: ModerationQueryDto): Promise<Paginated<VideoSummary>> {
+  moderationQueue(@Query() query: ModerationQueryDto): Promise<Paginated<ModerationItem>> {
     return this.adminService.moderationQueue(query);
   }
 
@@ -99,7 +99,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: ModerationDecisionDto,
     @CurrentUser('id') adminId: string,
-  ): Promise<VideoSummary> {
+  ): Promise<ModerationItem> {
     return this.adminService.moderate(id, dto, adminId);
   }
 

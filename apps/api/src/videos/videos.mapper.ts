@@ -2,6 +2,7 @@ import type { Category, Source, User, Video } from '@prisma/client';
 import type {
   CategoryDto,
   MaturityRating,
+  ModerationItem,
   ModerationStatus,
   VideoDetail,
   VideoSummary,
@@ -52,6 +53,23 @@ export function toVideoSummary(video: VideoWithRelations): VideoSummary {
     trendingScore: video.trendingScore,
     moderationStatus: video.moderationStatus as ModerationStatus,
     createdAt: video.createdAt.toISOString(),
+  };
+}
+
+/**
+ * A moderation-queue row.
+ *
+ * Adds the playable URL, which `toVideoSummary` deliberately withholds — a
+ * public listing must not hand out a stream for something still unapproved.
+ * Only ever used behind the admin guard, where watching before deciding is the
+ * entire job.
+ */
+export function toModerationItem(video: VideoWithRelations): ModerationItem {
+  return {
+    ...toVideoSummary(video),
+    playbackUrl: video.playbackUrl,
+    moderationNote: video.moderationNote,
+    moderatedAt: video.moderatedAt ? video.moderatedAt.toISOString() : null,
   };
 }
 

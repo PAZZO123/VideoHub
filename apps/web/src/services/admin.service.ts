@@ -3,6 +3,8 @@ import type {
   AdminUserDto,
   CategoryDto,
   GenreDto,
+  MaturityRating,
+  ModerationItem,
   ModerationStatus,
   MovieDetail,
   Paginated,
@@ -34,15 +36,29 @@ export const adminService = {
   },
 
   // --- moderation ---
-  moderationQueue(status: ModerationStatus = 'PENDING', page = 1): Promise<Paginated<VideoSummary>> {
-    return unwrap(api.get('/admin/moderation', { params: { status, page } }));
+  moderationQueue(
+    status: ModerationStatus = 'PENDING',
+    page = 1,
+    q?: string,
+  ): Promise<Paginated<ModerationItem>> {
+    return unwrap(
+      api.get('/admin/moderation', { params: { status, page, ...(q ? { q } : {}) } }),
+    );
   },
 
-  moderate(id: string, status: ModerationStatus, note?: string): Promise<VideoSummary> {
+  moderate(
+    id: string,
+    status: ModerationStatus,
+    note?: string,
+    maturityRating?: MaturityRating,
+  ): Promise<ModerationItem> {
     return unwrap(
       api.patch(`/admin/moderation/${encodeURIComponent(id)}`, {
         status,
         ...(note ? { note } : {}),
+        // Only sent when the moderator actually changed it, so omitting it
+        // leaves the uploader's own classification alone.
+        ...(maturityRating ? { maturityRating } : {}),
       }),
     );
   },

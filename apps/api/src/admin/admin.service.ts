@@ -7,10 +7,10 @@ import {
   type AdminUserDto,
   type CategoryDto,
   type GenreDto,
+  type ModerationItem,
   type MovieDetail,
   type Paginated,
   type SourceDto,
-  type VideoSummary,
 } from '@videohub/types';
 import slugify from 'slugify';
 import { paginate } from '../common/dto/pagination.dto';
@@ -22,7 +22,7 @@ import {
   toSourceDto,
 } from '../movies/movies.mapper';
 import { PrismaService } from '../prisma/prisma.service';
-import { VIDEO_SUMMARY_INCLUDE, toCategoryDto, toVideoSummary } from '../videos/videos.mapper';
+import { VIDEO_SUMMARY_INCLUDE, toCategoryDto, toModerationItem } from '../videos/videos.mapper';
 import type {
   AdminUsersQueryDto,
   CreateCategoryDto,
@@ -192,8 +192,24 @@ export class AdminService {
 
   // --- moderation -----------------------------------------------------------
 
-  async moderationQueue(query: ModerationQueryDto): Promise<Paginated<VideoSummary>> {
-    const where = { moderationStatus: query.status ?? ModerationStatus.PENDING };
+  async moderationQueue(query: ModerationQueryDto): Promise<Paginated<ModerationItem>> {
+    const search = query.q?.trim();
+
+    const where: Prisma.VideoWhereInput = {
+      moderationStatus: query.status ?? ModerationStatus.PENDING,
+      // A queue of a hundred items is unusable without this. Searching the
+      // uploader too, because "everything from this account" is a real review
+      // question once one uploader turns out to be a problem.
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: 'insensitive' } },
+              { description: { contains: search, mode: 'insensitive' } },
+              { uploader: { displayName: { contains: search, mode: 'insensitive' } } },
+            ],
+          }
+        : {}),
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.video.findMany({
@@ -207,14 +223,14 @@ export class AdminService {
       this.prisma.video.count({ where }),
     ]);
 
-    return paginate(items.map(toVideoSummary), query.page, query.take, total);
+    return paginate(items.map(toModerationItem), query.page, query.take, total);
   }
 
   async moderate(
     videoId: string,
     dto: ModerationDecisionDto,
     moderatorId: string,
-  ): Promise<VideoSummary> {
+  ): Promise<ModerationItem> {
     const existing = await this.prisma.video.findUnique({ where: { id: videoId } });
     if (!existing) {
       throw AppException.notFound(ErrorCode.VIDEO_NOT_FOUND, 'That video could not be found.');
@@ -233,12 +249,18 @@ export class AdminService {
         moderationStatus: dto.status,
         moderationNote: dto.note ?? null,
         moderatedAt: new Date(),
+        // Only when the moderator actually set one — omitting it must leave the
+        // uploader's classification alone rather than resetting it.
+        ...(dto.maturityRating ? { maturityRating: dto.maturityRating } : {}),
       },
       include: VIDEO_SUMMARY_INCLUDE,
     });
 
-    this.logger.log(`Video ${videoId} ${dto.status.toLowerCase()} by ${moderatorId}`);
-    return toVideoSummary(video);
+    this.logger.log(
+      `Video ${videoId} ${dto.status.toLowerCase()} by ${moderatorId}` +
+        (dto.maturityRating ? ` (reclassified ${dto.maturityRating})` : ''),
+    );
+    return toModerationItem(video);
   }
 
   async deleteVideo(id: string): Promise<{ removed: true }> {
