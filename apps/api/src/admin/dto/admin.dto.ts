@@ -180,6 +180,15 @@ export class ModerationDecisionDto {
   @MaxLength(500)
   @Transform(trim)
   note?: string;
+
+  @ApiPropertyOptional({
+    enum: Object.values(MaturityRating),
+    description:
+      'Reclassify while deciding. An uploader can understate how adult their video is, so the moderator — who has now watched it — gets the final say.',
+  })
+  @IsOptional()
+  @IsEnum(MaturityRating)
+  maturityRating?: MaturityRating;
 }
 
 export class UpdateUserDto {
@@ -199,6 +208,15 @@ export class ModerationQueryDto extends PaginationDto {
   @IsOptional()
   @IsEnum(ModerationStatus)
   status?: ModerationStatus;
+
+  @ApiPropertyOptional({
+    description: 'Match on title, description or uploader name. Case-insensitive.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  @Transform(trim)
+  q?: string;
 }
 
 export class AdminUsersQueryDto extends PaginationDto {

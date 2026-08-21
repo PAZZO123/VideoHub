@@ -1,5 +1,5 @@
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ModerationStatus } from '@prisma/client';
+import { MaturityRating, ModerationStatus } from '@prisma/client';
 import { ErrorCode, UserRole } from '@videohub/types';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminService } from './admin.service';
@@ -213,6 +213,57 @@ describe('AdminService', () => {
       const call = prisma.video.findMany.mock.calls[0][0];
       expect(call.where.moderationStatus).toBe(ModerationStatus.PENDING);
       expect(call.orderBy).toEqual({ createdAt: 'asc' });
+    });
+
+    it('leaves the uploader’s rating alone when the moderator did not change it', async () => {
+      // Omitting the field must not silently reset a classification.
+      await service.moderate('v1', { status: ModerationStatus.APPROVED }, ADMIN_ID);
+
+      expect(prisma.video.update.mock.calls[0][0].data).not.toHaveProperty('maturityRating');
+    });
+
+    it('applies a reclassification made while deciding', async () => {
+      // An uploader can understate how adult their video is; the moderator has
+      // now watched it and gets the final say.
+      await service.moderate(
+        'v1',
+        { status: ModerationStatus.APPROVED, maturityRating: MaturityRating.ADULT },
+        ADMIN_ID,
+      );
+
+      expect(prisma.video.update.mock.calls[0][0].data.maturityRating).toBe(MaturityRating.ADULT);
+    });
+
+    describe('search', () => {
+      const queueQuery = (extra: Record<string, unknown> = {}) =>
+        Object.assign(Object.create(null), { page: 1, limit: 24, skip: 0, take: 24, ...extra });
+
+      it('matches title, description and uploader', async () => {
+        // "everything from this account" is a real review question once one
+        // uploader turns out to be a problem.
+        await service.moderationQueue(queueQuery({ q: 'bunny' }) as never);
+
+        const { OR } = prisma.video.findMany.mock.calls[0][0].where;
+        expect(OR).toHaveLength(3);
+        expect(OR[0].title).toEqual({ contains: 'bunny', mode: 'insensitive' });
+        expect(OR[2].uploader.displayName).toEqual({ contains: 'bunny', mode: 'insensitive' });
+      });
+
+      it('still filters by status while searching', async () => {
+        await service.moderationQueue(
+          queueQuery({ q: 'bunny', status: ModerationStatus.APPROVED }) as never,
+        );
+
+        expect(prisma.video.findMany.mock.calls[0][0].where.moderationStatus).toBe(
+          ModerationStatus.APPROVED,
+        );
+      });
+
+      it('does not add a filter for an empty search', async () => {
+        await service.moderationQueue(queueQuery({ q: '   ' }) as never);
+
+        expect(prisma.video.findMany.mock.calls[0][0].where).not.toHaveProperty('OR');
+      });
     });
   });
 

@@ -671,6 +671,37 @@ five-per-minute throttle permits enough concurrency to take the process out with
 an OOM. Measured on a 400 MB upload, peak API memory grew by 5 MB. The spool file
 is removed on every exit path, including rejection.
 
+### Reviewing the queue
+
+Each row carries what a decision actually needs:
+
+- **Watch** expands an inline player. It mounts only when asked — a queue page
+  would otherwise open a video connection per row — and uses `preload="none"`,
+  so nothing downloads until play is pressed.
+- **Search** matches title, description and uploader name, debounced. Searching
+  the uploader matters once one account turns out to be a problem: "everything
+  from this person" is a real review question.
+- **Rating** can be changed while deciding. An uploader can understate how adult
+  their video is, and the moderator has now watched it. The new rating is sent
+  only when it was actually changed, so an untouched dropdown never overwrites
+  the uploader's own choice.
+- **Approve** disappears once a video is approved — approving something already
+  approved does nothing. What remains is **Unpublish** (with a reason the
+  uploader sees) and **Delete**, which asks for confirmation first.
+
+### Adult content
+
+An uploader picks an audience when uploading, and a moderator confirms or
+changes it. Marking something **ADULT** removes it from the public surface
+entirely: it is absent from the homepage, listings, search and trending for
+guests *and* for signed-in users who have not verified their age. Only a
+signed-in visitor who has confirmed they are 18+ (Profile → verify age) can find
+or watch it.
+
+Kids Mode overrides age verification: a verified adult browsing in Kids Mode
+sees only KIDS content. Refusals are `404`, never `403`, so the gate cannot be
+used to confirm that a title exists.
+
 ### Admin safety rails
 
 The admin surface refuses actions that would leave the platform unmanageable:

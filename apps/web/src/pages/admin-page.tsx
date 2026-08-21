@@ -1,7 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ModerationStatus, VideoSummary } from '@videohub/types';
 import {
-  Check,
   Clock,
   Download,
   Film,
@@ -11,10 +9,10 @@ import {
   Trash2,
   Users,
   Video,
-  X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Route, Routes } from 'react-router-dom';
+import { ModerationPanel } from '@/components/admin/moderation-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, ErrorState, Spinner } from '@/components/ui/states';
@@ -130,164 +128,6 @@ function Dashboard(): JSX.Element {
             </ol>
           )}
         </section>
-      </div>
-    </div>
-  );
-}
-
-// --- moderation --------------------------------------------------------------
-
-function ModerationRow({ video }: { video: VideoSummary }): JSX.Element {
-  const queryClient = useQueryClient();
-  const [note, setNote] = useState('');
-  const [rejecting, setRejecting] = useState(false);
-
-  const decide = useMutation({
-    mutationFn: ({ status, reason }: { status: ModerationStatus; reason?: string }) =>
-      adminService.moderate(video.id, status, reason),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['admin-moderation'] });
-      void queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
-    },
-  });
-
-  return (
-    <li className="rounded-xl border border-white/[0.06] bg-ink-850 p-4">
-      <div className="flex items-start gap-4">
-        <div className="h-16 w-28 shrink-0 overflow-hidden rounded-lg bg-ink-800">
-          {video.thumbnailUrl ? (
-            <img
-              src={video.thumbnailUrl}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="grid size-full place-items-center">
-              <Video className="size-5 text-ink-500" aria-hidden="true" />
-            </div>
-          )}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <h3 className="truncate font-semibold text-ink-100">{video.title}</h3>
-          <p className="mt-1 text-xs text-ink-400">
-            {video.uploaderName ? `by ${video.uploaderName}` : 'Unknown uploader'}
-            {' · '}
-            <time dateTime={video.createdAt}>
-              {new Date(video.createdAt).toLocaleDateString()}
-            </time>
-            {video.category && ` · ${video.category.name}`}
-          </p>
-          {video.description && (
-            <p className="mt-2 line-clamp-2 text-xs text-ink-400">{video.description}</p>
-          )}
-
-          {rejecting ? (
-            <div className="mt-3">
-              {/* A rejection must say why — the server enforces this too. */}
-              <Input
-                label="Reason for rejection"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-                placeholder="Explain what the uploader needs to fix"
-                hint="The uploader sees this."
-              />
-              <div className="mt-2 flex gap-2">
-                <Button
-                  size="sm"
-                  variant="danger"
-                  disabled={!note.trim()}
-                  isLoading={decide.isPending}
-                  onClick={() => decide.mutate({ status: 'REJECTED', reason: note })}
-                >
-                  Confirm rejection
-                </Button>
-                <Button size="sm" variant="ghost" onClick={() => setRejecting(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="mt-3 flex gap-2">
-              <Button
-                size="sm"
-                isLoading={decide.isPending}
-                leftIcon={<Check className="size-3.5" />}
-                onClick={() => decide.mutate({ status: 'APPROVED' })}
-              >
-                Approve
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                leftIcon={<X className="size-3.5" />}
-                onClick={() => setRejecting(true)}
-              >
-                Reject
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </li>
-  );
-}
-
-function Moderation(): JSX.Element {
-  const [status, setStatus] = useState<ModerationStatus>('PENDING');
-
-  const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['admin-moderation', status],
-    queryFn: () => adminService.moderationQueue(status),
-  });
-
-  const tabs: ModerationStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
-
-  return (
-    <div>
-      <div className="flex flex-wrap gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setStatus(tab)}
-            aria-current={status === tab ? 'true' : undefined}
-            className={cn(
-              'rounded-full border px-4 py-2 text-sm font-medium transition-colors',
-              status === tab
-                ? 'border-brand-400 bg-brand-500/15 text-white'
-                : 'border-white/10 bg-white/[0.03] text-ink-300 hover:text-white',
-            )}
-          >
-            {tab.charAt(0) + tab.slice(1).toLowerCase()}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        {isError ? (
-          <ErrorState title="Couldn't load the queue" onRetry={() => void refetch()} />
-        ) : isPending ? (
-          <div className="flex justify-center py-16">
-            <Spinner className="size-8" />
-          </div>
-        ) : data.items.length === 0 ? (
-          <EmptyState
-            icon={<ShieldCheck className="size-9" />}
-            title={status === 'PENDING' ? 'Nothing awaiting review' : `No ${status.toLowerCase()} uploads`}
-            description={
-              status === 'PENDING' ? 'New uploads will appear here for review.' : undefined
-            }
-          />
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {data.items.map((video) => (
-              <ModerationRow key={video.id} video={video} />
-            ))}
-          </ul>
-        )}
       </div>
     </div>
   );
@@ -583,7 +423,7 @@ export default function AdminPage(): JSX.Element {
       <div className="mt-8">
         <Routes>
           <Route index element={<Dashboard />} />
-          <Route path="moderation" element={<Moderation />} />
+          <Route path="moderation" element={<ModerationPanel />} />
           <Route path="users" element={<UsersPanel />} />
           <Route path="taxonomy" element={<Taxonomy />} />
         </Routes>

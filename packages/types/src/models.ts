@@ -93,6 +93,19 @@ export interface MovieDetail extends MovieSummary {
   updatedAt: string;
 }
 
+/**
+ * A queue row, which is a VideoSummary plus what a moderator needs to decide.
+ *
+ * `playbackUrl` is deliberately absent from VideoSummary — public listings must
+ * not hand out a playable URL for something still unapproved. Here it is the
+ * whole point: a reviewer has to watch before judging.
+ */
+export interface ModerationItem extends VideoSummary {
+  playbackUrl: string | null;
+  moderationNote: string | null;
+  moderatedAt: string | null;
+}
+
 export interface VideoSummary {
   id: string;
   slug: string;

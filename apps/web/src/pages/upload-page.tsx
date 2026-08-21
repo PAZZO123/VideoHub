@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UPLOAD_RULES, formatUploadLimit } from '@videohub/config';
-import type { ModerationStatus } from '@videohub/types';
+import type { MaturityRating, ModerationStatus } from '@videohub/types';
 import { CheckCircle2, Clock, FileVideo, Trash2, Upload, XCircle } from 'lucide-react';
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ export default function UploadPage(): JSX.Element {
   const [description, setDescription] = useState('');
   const [categorySlug, setCategorySlug] = useState('');
   const [tags, setTags] = useState('');
+  const [maturityRating, setMaturityRating] = useState<MaturityRating>('GENERAL');
   const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,7 @@ export default function UploadPage(): JSX.Element {
           description: description.trim() || undefined,
           categorySlug: categorySlug || undefined,
           tags: tags.trim() || undefined,
+          maturityRating,
           rightsConfirmed,
         },
         setProgress,
@@ -82,6 +84,7 @@ export default function UploadPage(): JSX.Element {
       setTitle('');
       setDescription('');
       setTags('');
+      setMaturityRating('GENERAL');
       setRightsConfirmed(false);
       setProgress(0);
       void queryClient.invalidateQueries({ queryKey: ['my-uploads'] });
@@ -210,6 +213,29 @@ export default function UploadPage(): JSX.Element {
             ))}
           </select>
         </label>
+
+        <div>
+          <label htmlFor="maturity" className="block text-sm font-medium text-ink-200">
+            Audience
+          </label>
+          <select
+            id="maturity"
+            value={maturityRating}
+            onChange={(event) => setMaturityRating(event.target.value as MaturityRating)}
+            className="mt-1.5 h-11 w-full rounded-xl border border-white/[0.08] bg-ink-800 px-3.5 text-sm text-ink-100 transition-colors hover:border-white/[0.16] focus:border-brand-400"
+          >
+            <option value="GENERAL">Everyone</option>
+            <option value="KIDS">Young children (Ibitente)</option>
+            <option value="TEEN">Teens</option>
+            <option value="MATURE">Mature themes</option>
+            <option value="ADULT">Adults only (18+)</option>
+          </select>
+          <p className="mt-1.5 text-sm text-ink-400">
+            {maturityRating === 'ADULT'
+              ? 'This will be hidden from the homepage, search and everyone browsing without an account. Only signed-in visitors who have confirmed they are 18+ can find or watch it.'
+              : 'A moderator confirms this before your video is published, and can change it.'}
+          </p>
+        </div>
 
         <Input
           label="Tags"
