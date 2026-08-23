@@ -44,6 +44,9 @@ Thumbs.db
 .eslintcache
 vite.config.ts.timestamp-*
 
+# Local editor/agent workspace. Kept on disk, never on the remote.
+.claude/
+
 # local media scratch (never commit media)
 # Anchored with a leading slash on purpose. A bare `storage/` or `uploads/`
 # matches at ANY depth, which silently swallowed apps/api/src/storage and
