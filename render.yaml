@@ -26,10 +26,20 @@ services:
     branch: main
     # Migrations run here rather than at boot: applying them once per deploy is
     # safer than racing several instances against the same schema.
+    #
+    # --include=dev is load-bearing. NODE_ENV=production below makes npm skip
+    # devDependencies, and typescript, prisma and @nestjs/cli all live there,
+    # so without it the build either cannot find tsc or picks up whatever
+    # TypeScript the build image happens to ship -- which failed here with
+    # "TS5108: Option 'moduleResolution=node10' has been removed" against a
+    # config the pinned 5.9.3 compiles fine.
+    #
+    # prisma generate comes BEFORE the compile: the API's TypeScript imports
+    # the generated client, so on a clean checkout nest build fails without it.
     buildCommand: >-
-      npm ci &&
-      npm run build &&
+      npm ci --include=dev &&
       npm run prisma:generate:ci --workspace=@videohub/api &&
+      npm run build:api &&
       npm run prisma:deploy:ci --workspace=@videohub/api
     startCommand: node apps/api/dist/main.js
     healthCheckPath: /api/health
@@ -104,7 +114,8 @@ services:
     # whole blueprint with "no such plan free for service type web" if one is
     # given. Only the Node service above takes a plan.
     branch: main
-    buildCommand: npm ci && npm run build
+    # See the API service: devDependencies carry vite, tailwind and tsc.
+    buildCommand: npm ci --include=dev && npm run build:web
     staticPublishPath: apps/web/dist
     envVars:
       - key: NODE_VERSION
