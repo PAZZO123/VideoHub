@@ -33,7 +33,9 @@
     "db:verify:admin": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-admin.ts",
     "db:clean:fixtures": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/clean-fixtures.ts",
     "db:sync:catalogue": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/sync-catalogue.ts",
+    "db:sync:catalogue:ci": "ts-node -P tsconfig.seed.json prisma/sync-catalogue.ts",
     "db:make:admin": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/make-admin.ts",
+    "db:make:admin:ci": "ts-node -P tsconfig.seed.json prisma/make-admin.ts",
     "prisma:generate:ci": "prisma generate",
     "prisma:deploy:ci": "prisma migrate deploy",
     "db:seed:ci": "ts-node -P tsconfig.seed.json prisma/seed.ts"
