@@ -100,7 +100,9 @@ services:
   - type: web
     name: videohub-web
     runtime: static
-    plan: free
+    # No `plan` here: static sites have no paid tiers, and Render rejects the
+    # whole blueprint with "no such plan free for service type web" if one is
+    # given. Only the Node service above takes a plan.
     branch: main
     buildCommand: npm ci && npm run build
     staticPublishPath: apps/web/dist
