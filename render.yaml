@@ -1,0 +1,119 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Two services: the NestJS API as a real Node process, and the React app as a
+# static site. Import this from the Render dashboard (Blueprints → New).
+#
+# The API is NOT serverless-friendly, which is why it is a web service rather
+# than functions on Netlify or Vercel:
+#
+#   * @nestjs/schedule crons (hourly trending, daily guest-conversation purge)
+#     need a process that stays alive between requests.
+#   * /api/ai/stream holds an SSE connection open while tokens arrive.
+#   * Uploads run to MAX_UPLOAD_MB (2 GB), far past serverless body limits.
+#
+# Region: Frankfurt, to sit beside the Neon database in eu-central-1. Measured
+# from Kigali, a round trip to Neon costs about a second; same-region it is a
+# few milliseconds, so this alone makes every page faster.
+
+services:
+  # --- API -------------------------------------------------------------------
+  - type: web
+    name: videohub-api
+    runtime: node
+    plan: free
+    region: frankfurt
+    branch: main
+    # Migrations run here rather than at boot: applying them once per deploy is
+    # safer than racing several instances against the same schema.
+    buildCommand: >-
+      npm ci &&
+      npm run build &&
+      npm run prisma:generate:ci --workspace=@videohub/api &&
+      npm run prisma:deploy:ci --workspace=@videohub/api
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production
+
+      # --- required, set these yourself in the dashboard --------------------
+      # Neon pooled connection string (the -pooler host).
+      - key: DATABASE_URL
+        sync: false
+      # Neon direct connection. Prisma Migrate needs the unpooled endpoint.
+      - key: DIRECT_URL
+        sync: false
+      # Generated once by Render and then held. Never reuse the dev secret.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      # The static site's URL. CORS rejects everything else, so this must be
+      # exact — no trailing slash.
+      - key: WEB_ORIGIN
+        sync: false
+
+      # --- object storage ---------------------------------------------------
+      # STORAGE_PROVIDER=local is refused when NODE_ENV=production: Render's
+      # free disk is ephemeral, so uploads and mirrored video would vanish on
+      # every deploy. Cloudflare R2 is the cheap option — its free tier gives
+      # 10 GB and charges nothing for egress, which matters when the payload is
+      # video.
+      - key: STORAGE_PROVIDER
+        value: r2
+      - key: STORAGE_BUCKET
+        sync: false
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_ACCESS_KEY
+        sync: false
+      - key: STORAGE_SECRET_KEY
+        sync: false
+      - key: STORAGE_PUBLIC_URL
+        sync: false
+      - key: STORAGE_REGION
+        value: auto
+
+      # --- behaviour --------------------------------------------------------
+      - key: MAX_UPLOAD_MB
+        value: "2048"
+      - key: VIDEO_CATALOGUE_PROVIDER
+        value: archive
+      # `mock` costs nothing and needs no key. Switch to claude/openai/gemini
+      # only after setting the matching API key — AI is open to signed-out
+      # visitors, so a real provider means anonymous traffic can spend money.
+      - key: AI_PROVIDER
+        value: mock
+      - key: AI_RATE_LIMIT_MAX
+        value: "10"
+      - key: RATE_LIMIT_MAX
+        value: "120"
+
+  # --- Web -------------------------------------------------------------------
+  - type: web
+    name: videohub-web
+    runtime: static
+    plan: free
+    branch: main
+    buildCommand: npm ci && npm run build
+    staticPublishPath: apps/web/dist
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Baked into the bundle at build time, so changing it needs a rebuild,
+      # not just a restart. Point it at the API service's URL + /api.
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      # The app is a single-page router: every unknown path must return
+      # index.html or a deep link like /videos/big-buck-bunny 404s on reload.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

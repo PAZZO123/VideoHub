@@ -250,6 +250,20 @@ npm run dev
 - API: http://localhost:3000/api
 - API docs: http://localhost:3000/api/docs
 
+## Deploying
+
+Step-by-step in **[DEPLOYMENT.md](DEPLOYMENT.md)**, with a Render blueprint in
+[`render.yaml`](render.yaml).
+
+Short version: the API needs a **long-running Node process**, not serverless
+functions — its scheduled jobs, its SSE stream and its 2 GB uploads all depend on
+one. Render (or Fly, or Railway) fits; Vercel and Netlify functions do not. The
+React app is static and can go anywhere, Netlify and Vercel included.
+
+Put the API in the same region as the database. From Kigali a round trip to Neon
+in `eu-central-1` costs about a second and the homepage makes several; running
+the API in Frankfurt makes that a few milliseconds.
+
 ## Neon database setup
 
 1. Create a project at [neon.tech](https://neon.tech) (free tier is enough).

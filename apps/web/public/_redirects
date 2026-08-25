@@ -1,0 +1,5 @@
+# SPA fallback: every unknown path serves index.html, so a deep link like
+# /videos/big-buck-bunny survives a refresh instead of 404ing.
+# Used by Netlify. Render gets the same rule from render.yaml; Vite copies
+# this file into dist untouched, where other hosts simply ignore it.
+/*  /index.html  200
