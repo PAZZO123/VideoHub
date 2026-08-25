@@ -26,6 +26,8 @@
     "db:verify": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-constraints.ts",
     "db:seed:demo": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/seed-demo.ts",
     "db:seed:demo:ci": "ts-node -P tsconfig.seed.json prisma/seed-demo.ts",
+    "db:movies:from:catalogue": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/movies-from-catalogue.ts",
+    "db:movies:from:catalogue:ci": "ts-node -P tsconfig.seed.json prisma/movies-from-catalogue.ts",
     "db:verify:agegate": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-age-gate.ts",
     "db:verify:trending": "dotenv -e ../../.env -- ts-node -P tsconfig.seed.json prisma/verify-trending.ts",
     "db:verify:all": "npm run db:clean:fixtures && npm run db:verify && npm run db:verify:agegate && npm run db:verify:trending && npm run db:verify:downloads && npm run db:verify:ai && npm run db:verify:admin",
