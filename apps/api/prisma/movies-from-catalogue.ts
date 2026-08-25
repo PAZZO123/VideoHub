@@ -14,7 +14,8 @@
  * existing split -- the movie detail page lists sources rather than embedding
  * a player -- and this script does not change it.
  *
- * Idempotent: upserts by slug, so re-run it after every catalogue sync.
+ * Idempotent: upserts on the archive.org identity (not the slug, which is
+ * derived from title and year), so re-run it after every catalogue sync.
  *
  *   npm run db:movies:from:catalogue --workspace=@videohub/api
  *   npm run db:movies:from:catalogue:ci --workspace=@videohub/api   (env from caller)

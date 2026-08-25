@@ -4,8 +4,14 @@ A video and movie discovery platform: browse and search a catalogue, get AI reco
 
 Free for every user. No subscription, no payment system — but the data model carries a `UserPlan` enum so a premium tier can be added later without a migration that touches every row.
 
-> **Status:** All seven phases complete and verified against a live Neon database.
-> Later phases are tracked in [Roadmap](#roadmap).
+> **Status:** All seven phases complete, deployed, and verified against a live
+> Neon database. Later phases are tracked in [Roadmap](#roadmap).
+>
+> **Live:** https://videohub-web.onrender.com
+>
+> Running the deployed system — operations, production commands and
+> troubleshooting — is documented separately in
+> [MAINTENANCE.md](MAINTENANCE.md).
 
 ---
 
@@ -30,6 +36,7 @@ Free for every user. No subscription, no payment system — but the data model c
 - [Resilience and accessibility](#resilience-and-accessibility)
 - [Security](#security)
 - [Deployment](#deployment)
+- [Maintenance and operations](MAINTENANCE.md)
 - [Roadmap](#roadmap)
 
 ---
