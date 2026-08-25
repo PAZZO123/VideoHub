@@ -9,7 +9,8 @@
 #   * @nestjs/schedule crons (hourly trending, daily guest-conversation purge)
 #     need a process that stays alive between requests.
 #   * /api/ai/stream holds an SSE connection open while tokens arrive.
-#   * Uploads run to MAX_UPLOAD_MB (2 GB), far past serverless body limits.
+#   * Uploads run to MAX_UPLOAD_MB — hundreds of megabytes, far past
+#     serverless body limits.
 #
 # Region: Frankfurt, to sit beside the Neon database in eu-central-1. Measured
 # from Kigali, a round trip to Neon costs about a second; same-region it is a
@@ -78,8 +79,11 @@ services:
         value: auto
 
       # --- behaviour --------------------------------------------------------
+      # 2 GB is the development ceiling. On R2's 10 GB free tier three uploads
+      # would fill the account, so production gets a figure that leaves room for
+      # the mirrored catalogue. Raise it once storage is paid for.
       - key: MAX_UPLOAD_MB
-        value: "2048"
+        value: "500"
       - key: VIDEO_CATALOGUE_PROVIDER
         value: archive
       # `mock` costs nothing and needs no key. Switch to claude/openai/gemini

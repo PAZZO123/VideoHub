@@ -13,7 +13,7 @@ that half regardless of preference:
 | --- | --- |
 | `@nestjs/schedule` crons — hourly trending, daily guest-conversation purge | No process stays alive between requests, so the decorators never fire |
 | `/api/ai/stream` holds an SSE connection open | Function timeouts cut the stream mid-answer |
-| Uploads up to `MAX_UPLOAD_MB` (2 GB) | Vercel caps a serverless request body at a few megabytes |
+| Uploads up to `MAX_UPLOAD_MB` — hundreds of megabytes | Vercel caps a serverless request body at a few megabytes |
 | Prisma against Neon | Every cold start opens a new connection; a pool is what stops the pooler running out |
 
 The **static app** is different — it is just files, so Render, Netlify and
@@ -110,13 +110,18 @@ npm run db:make:admin --workspace=@videohub/api -- you@example.com
 Then pull in real video:
 
 ```bash
-npm run db:sync:catalogue --workspace=@videohub/api -- --curated-only --mirror --mirror-max-mb=450
+npm run db:sync:catalogue --workspace=@videohub/api -- --curated-only --mirror --mirror-max-mb=200
 ```
 
 With `STORAGE_PROVIDER=r2` this mirrors into the bucket rather than local disk,
 so playback is served from R2's CDN. **The 2.3 GB mirrored during development
 lives on your laptop and does not transfer** — this re-downloads it into R2, and
 it is slow.
+
+The 200 MB cap is deliberate: it takes the short films and leaves the five
+feature-length ones streaming from archive.org, which is the difference between
+0.6 GB and 2.3 GB of your free 10. Raise it later for whichever titles turn out
+to be worth the space.
 
 ## 5. Verify
 
@@ -128,6 +133,40 @@ Expect `"status":"ok"` and `"database":"up"`. Then open the web URL and check
 the homepage rails, a video page, and `/admin` after signing in.
 
 ---
+
+## Making 10 GB of free storage go far
+
+R2's free tier is **10 GB**, and the whole curated catalogue mirrored is 2.3 GB —
+so it fits with room to spare. What eats the budget is not the catalogue, it is
+uploads and the handful of very large films.
+
+Measured from the development mirror, the **five longest titles are 1.7 GB, 73%
+of the total**, while the other seven together come to 603 MB:
+
+| | |
+| --- | --- |
+| The General, His Girl Friday, Nosferatu, Night of the Living Dead, Caligari | 1.7 GB |
+| the remaining seven | 0.6 GB |
+
+Four things keep you inside the free tier:
+
+1. **Cap what you mirror.** `--mirror-max-mb=200` keeps the short films and
+   leaves the feature-length ones streaming from archive.org. Slower for those
+   few, but the difference between 0.6 GB and 2.3 GB.
+2. **Mirror what people watch, not everything.** An unmirrored title still
+   plays; it is only slower. Mirror the homepage rails and the kids section
+   first, since those get opened most.
+3. **Keep `MAX_UPLOAD_MB` low in production.** The blueprint sets 500. At the
+   2 GB development ceiling, three uploads would fill the entire free account.
+4. **Pick R2 over S3 or B2 for the egress, not the storage.** All three give
+   about 10 GB free, but S3 charges roughly $0.09/GB to serve it. One person
+   watching a 400 MB film is 400 MB of egress; a hundred views is 40 GB. R2
+   charges nothing for egress, which for video matters far more than the 10 GB.
+
+If you outgrow it: Backblaze B2 also gives 10 GB free and is free to serve
+through Cloudflare, and Supabase Storage gives 1 GB — the app already supports
+`STORAGE_PROVIDER=supabase`. Beyond that, R2 is about $0.015/GB/month, so
+100 GB costs roughly $1.50 a month with egress still free.
 
 ## What the free tier actually costs you
 
