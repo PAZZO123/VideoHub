@@ -150,6 +150,28 @@ Three things are deliberately swappable behind interfaces, so none of them can s
 
 **The database stores metadata only.** Media bytes live in object storage and are referenced by URL or storage key. Never put video blobs in Postgres — it will exhaust a Neon free tier immediately.
 
+### Two content types: `Movie` and `Video`
+
+The most common source of confusion, so it is worth stating plainly. These are
+**separate tables serving separate purposes**, and a film often exists as both.
+
+| | `Video` | `Movie` |
+|---|---|---|
+| What it is | A playable file | A catalogue entry for a film |
+| Has a player | **Yes** — `playbackUrl` / `storageKey` | **No** |
+| Detail page shows | The video itself | Poster, synopsis, and sources to watch it |
+| Created by | `db:sync:catalogue`, user uploads | `db:movies:from:catalogue`, admin |
+| Moderated | Yes — `moderationStatus` | No |
+| Surfaces on | Videos, Trending, Ibitente, Cartoons, Kids | Movies |
+
+The `Video` is how you watch a title; the `Movie` is how you find and read about
+it. `db:movies:from:catalogue` derives the `Movie` rows *from* the `Video` rows,
+so the two never drift apart.
+
+**A full Videos page beside an empty Movies page is not a bug** — the catalogue
+sync creates only `Video` rows. Run `db:movies:from:catalogue` to build the
+Movies page from them.
+
 ## Technology stack
 
 | Layer | Choice |
@@ -331,7 +353,36 @@ npm run db:seed:demo --workspace=@videohub/api
 ```
 
 Optional public-domain demo content (8 films, 6 videos) so the homepage rails,
-trending job and Ibitente page render with real data during development.
+trending job and Ibitente page render with real data during development. These
+are skeleton records with no posters — for a deployed site prefer the catalogue,
+below.
+
+```bash
+npm run db:movies:from:catalogue --workspace=@videohub/api
+```
+
+Builds the Movies page from the curated catalogue: real posters, synopses and
+release years, plus an Internet Archive source per film. It removes the
+poster-less demo rows as it goes, and is idempotent, so **re-run it after every
+`db:sync:catalogue`**.
+
+### Running any of these against production
+
+Every script above is wrapped in `dotenv -e ../../.env`, which is right locally
+and wrong against a deployed database — the wrapper cannot override a variable
+you have already set, but it *will* quietly supply any variable you left out
+from your development `.env`.
+
+Each therefore has a **`:ci` twin** that reads only the caller's environment:
+`db:seed:ci`, `db:seed:demo:ci`, `db:make:admin:ci`, `db:sync:catalogue:ci`,
+`db:movies:from:catalogue:ci`, `prisma:generate:ci`, `prisma:deploy:ci`.
+
+```bash
+npx dotenv -e .env.production.local -- npm run db:seed:ci --workspace=@videohub/api
+```
+
+Adding a new script that touches the database? Add its `:ci` twin at the same
+time. Operational detail lives in [MAINTENANCE.md](MAINTENANCE.md).
 
 ### Becoming a moderator
 
@@ -396,6 +447,7 @@ npm run dev
 | `npm run db:seed` | Seed genres, categories and an admin |
 | `npm run db:seed:demo --workspace=@videohub/api` | Optional public-domain demo content |
 | `npm run db:sync:catalogue --workspace=@videohub/api` | Pull real public-domain video from the Internet Archive |
+| `npm run db:movies:from:catalogue --workspace=@videohub/api` | Build the Movies page from that catalogue — run after every sync |
 | `npm run db:make:admin --workspace=@videohub/api -- you@example.com` | Promote an account to ADMIN so it can moderate |
 | `npm run db:verify:all --workspace=@videohub/api` | Live checks against a running API + database |
 

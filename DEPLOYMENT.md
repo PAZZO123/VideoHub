@@ -22,10 +22,15 @@ both on Render is simpler (one dashboard, one blueprint, no CORS surprises);
 splitting the front end to Netlify is measurably faster for visitors far from
 Frankfurt. Either is defensible.
 
-**Region matters more than the host here.** Put the API in **Frankfurt**, beside
-the Neon database in `eu-central-1`. Measured from Kigali, one round trip to Neon
-costs about a second, and the homepage makes several. Same-region it is a few
-milliseconds.
+**Region matters more than the host here.** Put the API in the *same region as
+your Neon database* — check which one it is rather than assuming, since Neon
+picks a default at project creation. Measured from Kigali, one round trip to a
+distant Neon costs about a second, and the homepage makes several; same-region it
+is a few milliseconds.
+
+> The live deployment gets this wrong: its API is in Frankfurt while its database
+> is in AWS `us-east-2`. Render cannot relocate a service, so correcting it means
+> a replacement service with a new URL. See [MAINTENANCE.md](MAINTENANCE.md).
 
 ---
 
@@ -92,26 +97,42 @@ set the two variables, then redeploy. The API will reject browser requests until
 
 ## 4. Seed and fill the catalogue
 
-From your machine, pointed at the production database. Set `DATABASE_URL` and
-`DIRECT_URL` to the Neon strings for the length of the command:
+From your machine, pointed at the production database.
+
+Put the production values in `.env.production.local` at the repository root —
+the `.env.*.local` rule in `.gitignore` already covers that name — and use the
+**`:ci`** script variants. The ordinary scripts are wrapped in
+`dotenv -e ../../.env`, and while that wrapper cannot override a variable you
+have already set, it *does* quietly fill in any variable you left out from your
+development environment. The `:ci` twins read nothing but the caller's
+environment, so a half-configured run fails instead of half-targeting your
+laptop.
 
 ```bash
-npm run db:seed --workspace=@videohub/api
+npx dotenv -e .env.production.local -- npm run db:seed:ci --workspace=@videohub/api
 ```
 
-That writes the genres, categories and — if `SEED_ADMIN_EMAIL` and
+That writes the genres and categories and — if `SEED_ADMIN_EMAIL` and
 `SEED_ADMIN_PASSWORD` are set — an admin. Otherwise register through the UI and
 promote yourself:
 
 ```bash
-npm run db:make:admin --workspace=@videohub/api -- you@example.com
+npx dotenv -e .env.production.local -- npm run db:make:admin:ci --workspace=@videohub/api -- you@example.com
 ```
 
-Then pull in real video:
+They must sign out and back in afterwards: the role is baked into the access
+token when it is issued.
+
+Then pull in real video, and build the Movies page from it:
 
 ```bash
-npm run db:sync:catalogue --workspace=@videohub/api -- --curated-only --mirror --mirror-max-mb=200
+npx dotenv -e .env.production.local -- npm run db:sync:catalogue:ci --workspace=@videohub/api -- --curated-only --mirror --mirror-max-mb=200
+npx dotenv -e .env.production.local -- npm run db:movies:from:catalogue:ci --workspace=@videohub/api
 ```
+
+**Both commands, not just the first.** The catalogue sync creates only `Video`
+rows; the second derives the `Movie` rows the Movies page reads. Skipping it
+leaves a full Videos page beside an empty Movies page.
 
 With `STORAGE_PROVIDER=r2` this mirrors into the bucket rather than local disk,
 so playback is served from R2's CDN. **The 2.3 GB mirrored during development

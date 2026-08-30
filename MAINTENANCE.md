@@ -77,12 +77,16 @@ sync only creates `Video` rows. Run `db:movies:from:catalogue`.
 ### The `:ci` scripts exist for a reason
 
 Most database scripts are wrapped in `dotenv -e ../../.env`, which loads the
-**local development** environment. That is correct for local work and dangerous
-when pointed at production — it would silently override the connection string
-you meant to use.
+**local development** environment.
+
+`dotenv-cli` does *not* override a variable that is already set — verified, the
+shell wins — so the hazard is not what it first looks like. The real one is
+**silent fallback**: any variable your production environment happens to *omit*
+is quietly filled in from the development `.env`. Point a half-configured shell
+at production and the missing pieces come from your laptop, with no warning.
 
 Every script that may be run against production therefore has a `:ci` twin with
-no wrapper, so **the caller's environment wins**:
+no wrapper, so nothing can be inherited from `.env` at all:
 
 | Local (uses `.env`) | Production (`:ci`, caller's env) |
 | --- | --- |
